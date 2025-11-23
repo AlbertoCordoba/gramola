@@ -1,0 +1,72 @@
+.registro-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background-color: #f0f2f5;
+  font-family: sans-serif;
+  padding: 20px;
+}
+
+.registro-card {
+  background: white;
+  padding: 2rem;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  width: 100%;
+  max-width: 500px;
+  text-align: center;
+}
+
+h2 { color: #1ed760; margin-bottom: 0.5rem; }
+
+.form-group { margin-bottom: 1rem; text-align: left; }
+.form-row { display: flex; gap: 10px; }
+.half { width: 50%; }
+
+label { display: block; margin-bottom: 0.5rem; font-weight: bold; color: #333; }
+
+input {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 5px;
+  box-sizing: border-box;
+}
+
+.btn-submit {
+  width: 100%;
+  padding: 12px;
+  background-color: #191414;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: bold;
+  margin-top: 1rem;
+}
+.btn-submit:hover { background-color: #333; }
+
+.location-box {
+  background: #f9f9f9;
+  padding: 10px;
+  border-radius: 5px;
+  border: 1px dashed #ccc;
+}
+.geo-inputs { display: flex; gap: 5px; margin-bottom: 5px; }
+.btn-geo {
+  width: 100%;
+  padding: 8px;
+  background-color: #2196F3;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.msg { padding: 10px; border-radius: 5px; margin-top: 10px; }
+.error { background-color: #ffe6e6; color: red; }
+.success { background-color: #e6fffa; color: #006644; }
+
+.footer-links { margin-top: 1.5rem; }
+a { color: #1ed760; text-decoration: none; }

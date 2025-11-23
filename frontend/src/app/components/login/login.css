@@ -1,0 +1,109 @@
+/* Contenedor principal que ocupa toda la pantalla */
+.login-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background-color: #f0f2f5; /* Gris muy suave de fondo */
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* La tarjeta blanca del centro */
+.login-card {
+  background: white;
+  padding: 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1); /* Sombra elegante */
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+}
+
+/* Títulos */
+h2 {
+  color: #1ed760; /* Verde estilo Spotify */
+  margin-bottom: 0.5rem;
+  font-size: 2rem;
+}
+
+.subtitle {
+  color: #666;
+  margin-bottom: 2rem;
+  font-size: 1rem;
+}
+
+/* Grupos del formulario */
+.form-group {
+  margin-bottom: 1.2rem;
+  text-align: left;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 600;
+  color: #333;
+  font-size: 0.9rem;
+}
+
+input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  box-sizing: border-box; /* Para que el padding no rompa el ancho */
+  font-size: 1rem;
+  transition: border-color 0.3s;
+}
+
+input:focus {
+  outline: none;
+  border-color: #1ed760; /* Borde verde al escribir */
+}
+
+/* Botón de Entrar */
+.btn-login {
+  width: 100%;
+  padding: 12px;
+  background-color: #191414; /* Negro intenso */
+  color: white;
+  border: none;
+  border-radius: 25px; /* Bordes redondeados estilo app */
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: bold;
+  margin-top: 1rem;
+  transition: background-color 0.3s;
+}
+
+.btn-login:hover {
+  background-color: #333; /* Un poco más claro al pasar el ratón */
+}
+
+/* Mensajes de error */
+.error-msg {
+  color: #d32f2f;
+  background-color: #ffebee;
+  padding: 10px;
+  border-radius: 4px;
+  margin-top: 10px;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
+/* Enlaces del pie */
+.footer-links {
+  margin-top: 2rem;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+a {
+  color: #1ed760;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+a:hover {
+  text-decoration: underline;
+}

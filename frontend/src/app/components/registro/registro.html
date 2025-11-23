@@ -1,1 +1,49 @@
-<p>registro works!</p>
+<div class="registro-container">
+  <div class="registro-card">
+    <h2>Crear Cuenta</h2>
+    <p>Únete a Gramola Virtual</p>
+
+    <form (ngSubmit)="onRegistro()">
+      
+      <div class="form-group">
+        <label>Nombre del Bar</label>
+        <input type="text" [(ngModel)]="registroData.nombre" name="nombre" placeholder="Bar Manolo" required>
+      </div>
+
+      <div class="form-group">
+        <label>Email</label>
+        <input type="email" [(ngModel)]="registroData.email" name="email" placeholder="hola@bar.com" required>
+      </div>
+
+      <div class="form-row">
+        <div class="form-group half">
+          <label>Contraseña</label>
+          <input type="password" [(ngModel)]="registroData.password" name="password" required>
+        </div>
+        <div class="form-group half">
+          <label>Repetir</label>
+          <input type="password" [(ngModel)]="registroData.confirmPassword" name="confirmPassword" required>
+        </div>
+      </div>
+
+      <!-- Botón del Bonus de Geolocalización -->
+      <div class="form-group location-box">
+        <label>Ubicación</label>
+        <div class="geo-inputs">
+          <input type="number" [(ngModel)]="registroData.latitud" name="latitud" placeholder="Lat" step="any">
+          <input type="number" [(ngModel)]="registroData.longitud" name="longitud" placeholder="Long" step="any">
+        </div>
+        <button type="button" class="btn-geo" (click)="obtenerUbicacion()">📍 Detectar Ubicación</button>
+      </div>
+
+      <div *ngIf="errorMessage" class="msg error">{{ errorMessage }}</div>
+      <div *ngIf="successMessage" class="msg success">{{ successMessage }}</div>
+
+      <button type="submit" class="btn-submit">Registrarse</button>
+    </form>
+
+    <div class="footer-links">
+      <p>¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a></p>
+    </div>
+  </div>
+</div>
