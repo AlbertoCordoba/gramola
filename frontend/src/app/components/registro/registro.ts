@@ -64,7 +64,12 @@ export class Registro {
       },
       error: (err: any) => {
         console.error('Error en registro:', err);
-        this.errorMessage = 'Error al registrar. El email podría estar en uso.';
+        // Mostramos el error que viene del backend si es texto
+        if (err.error && typeof err.error === 'string') {
+             this.errorMessage = err.error;
+        } else {
+             this.errorMessage = 'Error al registrar. El email podría estar en uso.';
+        }
       }
     });
   }
