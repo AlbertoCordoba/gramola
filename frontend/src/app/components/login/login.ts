@@ -2,7 +2,6 @@ import { Component, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
-// Importamos el servicio desde el archivo 'bar.ts'
 import { BarService } from '../../services/bar';
 
 @Component({
@@ -27,12 +26,10 @@ export class LoginComponent {
     this.barService.login(this.loginData).subscribe({
       next: (res: any) => {
         console.log('Login correcto:', res);
-        // Guardamos el usuario en el navegador (localStorage)
         localStorage.setItem('usuarioBar', JSON.stringify(res));
         
-        alert('¡Bienvenido ' + res.nombre + '!');
-        // Aquí redirigiríamos al dashboard en el futuro
-        // this.router.navigate(['/dashboard']); 
+        // REDIRECCIÓN A LA GRAMOLA
+        this.router.navigate(['/gramola']);
       },
       error: (err: any) => {
         console.error('Error:', err);

@@ -1,0 +1,119 @@
+.gramola-container {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #121212; 
+  color: white;
+  min-height: 100vh;
+}
+
+header {
+  background-color: #000;
+  padding: 1rem 2rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #333;
+}
+
+h1 { color: #1ed760; margin: 0; font-size: 1.5rem; }
+
+.user-info { display: flex; align-items: center; gap: 15px; }
+
+.btn-logout {
+  background: transparent; border: 1px solid #fff; color: #fff;
+  padding: 5px 15px; border-radius: 20px; cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-logout:hover { background: #fff; color: #000; }
+
+.dashboard-content { 
+  padding: 2rem;
+  max-width: 800px;
+  margin: 0 auto; 
+  text-align: center;
+}
+
+/* --- ESTILOS SPOTIFY / BÚSQUEDA --- */
+.spotify-card {
+    background: #282828;
+    padding: 30px;
+    border-radius: 10px;
+    margin-bottom: 30px;
+}
+.btn-spotify {
+    background-color: #1ed760;
+    color: black;
+    font-weight: bold;
+    border: none;
+    padding: 12px 30px;
+    border-radius: 25px;
+    margin-top: 15px;
+    cursor: pointer;
+    font-size: 1rem;
+    transition: background 0.2s;
+}
+.btn-spotify:hover {
+    background-color: #2eef71;
+}
+
+.search-section {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+.search-input {
+    padding: 12px;
+    width: 100%;
+    max-width: 400px;
+    border-radius: 25px;
+    border: 1px solid #444;
+    background: #333;
+    color: white;
+    font-size: 1rem;
+}
+.btn-search {
+    background-color: #1ed760;
+    color: black;
+    font-weight: bold;
+    border: none;
+    padding: 0 25px;
+    border-radius: 25px;
+    cursor: pointer;
+}
+
+/* Resultados */
+.results-grid {
+  margin-top: 20px;
+  text-align: left;
+}
+.song-card {
+  background: #282828;
+  padding: 10px 20px;
+  margin-bottom: 8px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.song-info h5 { margin: 0; font-size: 1rem; }
+.song-info p { margin: 0; color: #b3b3b3; font-size: 0.85rem; }
+
+.btn-pay {
+    background-color: #000;
+    color: #1ed760;
+    border: 1px solid #1ed760;
+    padding: 8px 15px;
+    border-radius: 20px;
+    cursor: pointer;
+    font-weight: bold;
+}
+.queue-title {
+    margin-top: 40px;
+    display: block;
+}
+.empty-state {
+    color: #b3b3b3;
+    padding: 20px;
+    border: 1px dashed #333;
+    border-radius: 8px;
+}

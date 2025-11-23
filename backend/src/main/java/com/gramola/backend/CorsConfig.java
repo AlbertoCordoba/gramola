@@ -1,0 +1,22 @@
+package com.gramola.backend;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+@Configuration
+public class CorsConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**") // Aplica la configuración a todos los endpoints
+                .allowedOrigins("http://localhost:4200", 
+                                "http://localhost:52693", // Incluimos el puerto actual
+                                "http://127.0.0.1:8080", 
+                                "http://127.0.0.1:4200", 
+                                "http://127.0.0.1:52693") // Incluimos la IP loopback
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(true);
+    }
+}
