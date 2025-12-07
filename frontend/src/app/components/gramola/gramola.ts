@@ -1,9 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnDestroy } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { SpotifyConnectService } from '../../services/spotify.service';
-// Make sure the path below matches the actual location of gramola.service.ts
 import { GramolaService } from '../../services/gramola.service';
 
 @Component({
@@ -13,7 +12,7 @@ import { GramolaService } from '../../services/gramola.service';
   templateUrl: './gramola.html',
   styleUrl: './gramola.css'
 })
-export class Gramola {
+export class Gramola implements OnDestroy {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private spotifyService = inject(SpotifyConnectService);
@@ -23,13 +22,18 @@ export class Gramola {
   spotifyConnected: boolean = false;
   busqueda: string = '';
   searchResults: any[] = [];
-  colaReproduccion: any[] = []; // Lista para la cola
+  colaReproduccion: any[] = [];
+  
+  // Variables del Reproductor
+  cancionActual: any = null;
+  audioPlayer = new Audio(); // Reproductor nativo de HTML
+  progreso: number = 0;
 
   constructor() {
     const userJson = localStorage.getItem('usuarioBar');
     if (userJson) {
       this.usuario = JSON.parse(userJson);
-      this.cargarCola(); // Cargar la cola al entrar
+      this.cargarCola();
     } else {
       this.router.navigate(['/login']);
       return;
@@ -41,7 +45,19 @@ export class Gramola {
         this.router.navigate([], { queryParams: { status: null }, replaceUrl: true });
       }
     });
+
+    // CRÍTICO 1: Cuando el audio termina, llama a la siguienteCancion()
+    this.audioPlayer.onended = () => this.siguienteCancion();
+    
+    // CRÍTICO 2: Actualiza la barra de progreso usando el tiempo real del audio
+    this.audioPlayer.ontimeupdate = () => {
+      if (this.audioPlayer.duration) {
+        this.progreso = (this.audioPlayer.currentTime / this.audioPlayer.duration) * 100;
+      }
+    };
   }
+  
+  // --- FUNCIONES DE INTERFAZ Y CONEXIÓN ---
 
   connectSpotify() {
     this.spotifyService.getAuthUrl().subscribe({
@@ -53,35 +69,97 @@ export class Gramola {
   search() {
     if (this.busqueda.length > 2) {
       this.spotifyService.searchTracks(this.busqueda).subscribe({
-        next: (res: any) => this.searchResults = res.tracks.items,
+        next: (res: any) => {
+          // Filtrar solo canciones con preview_url
+          this.searchResults = res.tracks.items.filter((track: any) => track.preview_url);
+        },
         error: (err) => console.error(err)
       });
     }
   }
 
-  // Nueva función: Añadir a la cola
+  // Corregido: Conversión segura del ID
   anadir(track: any) {
-    if(!confirm("¿Añadir '" + track.name + "' por 0.50€?")) return;
+    if(!confirm(`¿Pagar 0.50€ por "${track.name}"?`)) return;
 
-    this.gramolaService.anadirCancion(track, Number(this.usuario.id)).subscribe({
-    next: () => {
+    // SOLUCIÓN AL ERROR: Convertimos el ID a NUMBER para el servicio
+  console.log('Track seleccionado:', track);
+  const barIdNumerico = Number(this.usuario.id); 
+
+    this.gramolaService.anadirCancion(track, barIdNumerico).subscribe({
+      next: () => {
         alert("¡Canción añadida y pagada!");
         this.busqueda = '';
         this.searchResults = [];
-        this.cargarCola(); // Recargar la lista
-    },
-    error: (err) => alert("Error al añadir canción")
+        this.cargarCola(); // Recargar la lista, lo que activará la reproducción si es necesario
+      },
+      error: (err) => {
+        console.error(err);
+        alert("Error al añadir canción");
+      }
     });
   }
 
+  // --- GESTIÓN DE COLA Y REPRODUCCIÓN ---
+
   cargarCola() {
-    this.gramolaService.obtenerCola(this.usuario.id).subscribe({
-      next: (res: any) => this.colaReproduccion = res
+    const barIdNumerico = Number(this.usuario.id); 
+
+    this.gramolaService.obtenerCola(barIdNumerico).subscribe({
+      next: (res: any) => {
+        this.colaReproduccion = res;
+        // Si no hay nada sonando, intenta reproducir la primera de la cola
+        if (!this.cancionActual && this.colaReproduccion.length > 0) {
+          this.reproducir(this.colaReproduccion[0]);
+        }
+      },
+      error: (err) => console.error("Error cargando cola", err)
+    });
+  }
+
+  reproducir(cancion: any) {
+    this.cancionActual = cancion;
+    this.progreso = 0; // Resetear barra
+
+    // Avisar al backend que está SONANDO (Usamos Number() para la ID)
+    this.gramolaService.actualizarEstado(Number(cancion.id), 'SONANDO').subscribe();
+
+    if (cancion.previewUrl) {
+      this.audioPlayer.src = cancion.previewUrl;
+      this.audioPlayer.load();
+      
+      // Intentar reproducir
+      this.audioPlayer.play().catch(e => {
+         console.warn("Fallo al intentar reproducir el audio:", e);
+      });
+    } else {
+      // Si la canción no tiene preview, pasamos a la siguiente rápidamente
+      console.warn("Canción sin URL de audio. Saltando tras 2s.");
+      setTimeout(() => this.siguienteCancion(), 2000); 
+    }
+  }
+  
+  siguienteCancion() {
+    this.audioPlayer.pause();
+    
+    if (!this.cancionActual) return;
+
+    // Marcar como TERMINADA
+    // Es CRÍTICO que el ID sea NUMÉRICO para el Backend
+    this.gramolaService.actualizarEstado(Number(this.cancionActual.id), 'TERMINADA').subscribe(() => {
+      this.cancionActual = null;
+      this.progreso = 0;
+      this.cargarCola(); // Recargar cola para que la siguiente empiece
     });
   }
 
   logout() {
     localStorage.removeItem('usuarioBar');
+    this.audioPlayer.pause();
     this.router.navigate(['/login']);
+  }
+
+  ngOnDestroy() {
+    this.audioPlayer.pause();
   }
 }

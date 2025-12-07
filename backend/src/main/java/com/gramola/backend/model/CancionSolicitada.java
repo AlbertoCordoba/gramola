@@ -25,9 +25,32 @@ public class CancionSolicitada {
 
     @Column(name = "fecha_solicitud")
     private LocalDateTime fechaSolicitud;
+
+    @Column(name = "preview_url")
+    private String previewUrl;
     
+
+    @Column(name = "duracion_ms")
+    private Integer duracionMs;
+
     @PrePersist
     protected void onCreate() {
         fechaSolicitud = LocalDateTime.now();
+    }
+
+    public void setDuracionMs(Integer duracionMs) {
+        this.duracionMs = duracionMs;
+    }
+
+    public Integer getDuracionMs() {
+        return duracionMs;
+    }
+
+    public void setPreviewUrl(String previewUrl) {
+        this.previewUrl = previewUrl;
+    }
+
+    public String getPreviewUrl() {
+        return previewUrl;
     }
 }

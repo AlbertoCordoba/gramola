@@ -24,19 +24,34 @@ public class GramolaService {
 
     @Transactional
     public CancionSolicitada anadirCancion(Map<String, Object> datos) {
+        // La ID del bar se convierte de String (JSON) a Long (Java)
         Long barId = Long.valueOf(datos.get("barId").toString());
         
-        // 1. Crear y guardar la canción en COLA
         CancionSolicitada cancion = new CancionSolicitada();
         cancion.setBarId(barId);
         cancion.setSpotifyId((String) datos.get("spotifyId"));
         cancion.setTitulo((String) datos.get("titulo"));
         cancion.setArtista((String) datos.get("artista"));
+        // ACEPTAMOS Y GUARDAMOS LA URL DE AUDIO
+        cancion.setPreviewUrl((String) datos.get("previewUrl"));
+        Object duracionMsObj = datos.get("duracionMs");
+        if (duracionMsObj != null) {
+            if (duracionMsObj instanceof Number) {
+                cancion.setDuracionMs(((Number) duracionMsObj).intValue());
+            } else {
+                try {
+                    cancion.setDuracionMs(Integer.parseInt(duracionMsObj.toString()));
+                } catch (NumberFormatException e) {
+                    cancion.setDuracionMs(0);
+                }
+            }
+        } else {
+            cancion.setDuracionMs(0);
+        }
         cancion.setEstado("COLA");
         
         cancion = cancionRepository.save(cancion);
 
-        // 2. Simular el registro del pago (Requisito de la práctica)
         Pagos pago = new Pagos();
         pago.setBarId(barId);
         pago.setCancionId(cancion.getId());
@@ -51,5 +66,13 @@ public class GramolaService {
 
     public List<CancionSolicitada> obtenerCola(Long barId) {
         return cancionRepository.findByBarIdAndEstadoOrderByFechaSolicitudAsc(barId, "COLA");
+    }
+
+    // NUEVO: Método para cambiar estado (ej: cuando termina de sonar)
+    @Transactional
+    public void actualizarEstado(Long id, String estado) {
+        CancionSolicitada c = cancionRepository.findById(id).orElseThrow();
+        c.setEstado(estado);
+        cancionRepository.save(c);
     }
 }

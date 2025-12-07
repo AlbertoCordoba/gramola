@@ -10,7 +10,7 @@ import java.util.Collections;
 
 @RestController
 @RequestMapping("/api/spotify")
-@CrossOrigin(origins = "http://localhost:5269")
+@CrossOrigin(origins = "http://localhost:4200")
 public class SpotifyController {
 
     @Autowired
@@ -28,7 +28,7 @@ public class SpotifyController {
         spotifyService.exchangeCodeForToken(code);
         
         // Redirigimos a Angular (Frontend) indicando que la conexión fue exitosa
-        return new RedirectView("http://localhost:52693/gramola?status=connected");
+        return new RedirectView("http://localhost:4200/gramola?status=connected");
     }
 
     // Endpoint 3: Buscar canciones

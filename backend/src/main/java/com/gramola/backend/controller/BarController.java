@@ -12,7 +12,7 @@ import java.util.Collections; // Import necesario para el mapa
 
 @RestController
 @RequestMapping("/api/bares")
-@CrossOrigin(origins = "http://localhost:52693")
+@CrossOrigin(origins = "http://localhost:4200")
 public class BarController {
 
     @Autowired

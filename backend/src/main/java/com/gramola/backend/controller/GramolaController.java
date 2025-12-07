@@ -20,7 +20,7 @@ public class GramolaController {
     public ResponseEntity<?> anadir(@RequestBody Map<String, Object> datos) {
         try {
             gramolaService.anadirCancion(datos);
-            return ResponseEntity.ok(Collections.singletonMap("mensaje", "Canción pagada y añadida a la cola"));
+            return ResponseEntity.ok(Collections.singletonMap("mensaje", "Canción pagada y en cola"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
         }
@@ -29,5 +29,16 @@ public class GramolaController {
     @GetMapping("/cola/{barId}")
     public ResponseEntity<?> verCola(@PathVariable Long barId) {
         return ResponseEntity.ok(gramolaService.obtenerCola(barId));
+    }
+
+    // NUEVO ENDPOINT: Para que el frontend avise cuando una canción empieza/termina
+    @PostMapping("/cola/estado")
+    public ResponseEntity<?> cambiarEstado(@RequestBody Map<String, Object> payload) {
+        // Convertimos el ID de String/Integer a Long para la BD
+        Long id = Long.valueOf(payload.get("id").toString());
+        String estado = (String) payload.get("estado");
+        
+        gramolaService.actualizarEstado(id, estado);
+        return ResponseEntity.ok().build();
     }
 }
