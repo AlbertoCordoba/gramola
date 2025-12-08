@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.view.RedirectView;
 
 import java.util.Collections;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/spotify")
@@ -16,32 +17,56 @@ public class SpotifyController {
     @Autowired
     private SpotifyService spotifyService;
 
-    // Endpoint 1: Pide la URL de autenticación al servicio
+    // 1. Pide la URL (Ahora requiere barId)
     @GetMapping("/auth-url")
-    public ResponseEntity<?> getAuthUrl() {
-        return ResponseEntity.ok(Collections.singletonMap("url", spotifyService.getAuthorizationUrl()));
+    public ResponseEntity<?> getAuthUrl(@RequestParam Long barId) {
+        return ResponseEntity.ok(Collections.singletonMap("url", spotifyService.getAuthorizationUrl(barId)));
     }
 
-    // Endpoint 2: Recibe el código de Spotify (es la Redirect URI)
+    // 2. Callback (Lee el 'state' para saber qué bar es)
     @GetMapping("/callback")
-    public RedirectView callback(@RequestParam String code) {
-        spotifyService.exchangeCodeForToken(code);
-        
-        // Redirigimos a Angular (Frontend) indicando que la conexión fue exitosa
-        return new RedirectView("http://localhost:4200/gramola?status=connected");
+    public RedirectView callback(@RequestParam String code, @RequestParam String state) {
+        try {
+            Long barId = Long.valueOf(state);
+            spotifyService.exchangeCodeForToken(code, barId);
+            // Redirige al frontend limpio, ya no hace falta pasar token por URL insegura
+            // porque el frontend lo pedirá al endpoint /token
+            return new RedirectView("http://localhost:4200/gramola?status=success");
+        } catch (Exception e) {
+            return new RedirectView("http://localhost:4200/gramola?status=error");
+        }
     }
 
-    // Endpoint 3: Buscar canciones
-    @GetMapping("/search")
-    public ResponseEntity<?> search(@RequestParam String q) {
-        // LOGGING: Muestra que la petición de búsqueda ha llegado al backend
-        System.out.println("-> Petición de búsqueda recibida. Query: " + q); 
+    // 3. Endpoint para que el SDK de Angular obtenga el token
+    @GetMapping("/token")
+    public ResponseEntity<?> getToken(@RequestParam Long barId) {
         try {
-            return ResponseEntity.ok(spotifyService.searchTracks(q));
+            // Esto refrescará el token si es necesario antes de dárselo al frontend
+            String token = spotifyService.getAccessTokenForBar(barId);
+            return ResponseEntity.ok(Collections.singletonMap("access_token", token));
         } catch (Exception e) {
-            // LOGGING: Muestra si hay un error al procesar la búsqueda
-            System.err.println("-> Error procesando la búsqueda: " + e.getMessage());
             return ResponseEntity.status(401).body(Collections.singletonMap("error", e.getMessage()));
+        }
+    }
+
+    // 4. Buscar
+    @GetMapping("/search")
+    public ResponseEntity<?> search(@RequestParam String q, @RequestParam Long barId) {
+        return ResponseEntity.ok(spotifyService.searchTracks(q, barId));
+    }
+    
+    // 5. Reproducir (Proxy para evitar problemas CORS en frontend)
+    @PostMapping("/play")
+    public ResponseEntity<?> play(@RequestBody Map<String, Object> payload) {
+        Long barId = Long.valueOf(payload.get("barId").toString());
+        String deviceId = (String) payload.get("deviceId");
+        String spotifyId = (String) payload.get("spotifyId");
+        
+        try {
+            spotifyService.playTrack("spotify:track:" + spotifyId, deviceId, barId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
         }
     }
 }

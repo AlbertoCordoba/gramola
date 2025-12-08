@@ -7,15 +7,39 @@ import { Observable } from 'rxjs';
 })
 export class SpotifyConnectService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://127.0.0.1:8080/api/spotify';
+  // Asegúrate de que este puerto coincida con tu backend (8080)
+  private apiUrl = 'http://localhost:8080/api/spotify';
 
-  // Llama al backend para obtener la URL de login de Spotify
-  getAuthUrl(): Observable<{ url: string }> {
-    return this.http.get<{ url: string }>(`${this.apiUrl}/auth-url`);
+  // 1. Obtener URL de Auth (Pasamos barId para el 'state')
+  getAuthUrl(barId: number): Observable<{ url: string }> {
+    return this.http.get<{ url: string }>(`${this.apiUrl}/auth-url`, { 
+      params: { barId: barId.toString() } 
+    });
   }
 
-  // Llama al backend para buscar canciones (requiere que el token ya esté guardado en el backend)
-  searchTracks(query: string): Observable<any> {
-    return this.http.get(`${this.apiUrl}/search`, { params: { q: query } });
+  // 2. Buscar canciones (Pasamos barId para que el backend use el token correcto)
+  searchTracks(query: string, barId: number): Observable<any> {
+    return this.http.get(`${this.apiUrl}/search`, { 
+      params: { 
+        q: query,
+        barId: barId.toString() 
+      } 
+    });
+  }
+
+  // 3. Obtener Token para el SDK (Frontend) - ESTE FALTABA
+  getToken(barId: number): Observable<{ access_token: string }> {
+    return this.http.get<{ access_token: string }>(`${this.apiUrl}/token`, {
+      params: { barId: barId.toString() }
+    });
+  }
+
+  // 4. Reproducir canción (Proxy al backend) - ESTE FALTABA
+  playTrack(spotifyId: string, deviceId: string, barId: number): Observable<any> {
+    return this.http.post(`${this.apiUrl}/play`, {
+      barId,
+      deviceId,
+      spotifyId
+    });
   }
 }

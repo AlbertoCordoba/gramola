@@ -1,119 +1,229 @@
-.gramola-container {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-  background-color: #121212; 
-  color: white;
+/* --- VARIABLES & RESET --- */
+:host {
+  --primary: #1ed760;
+  --primary-dark: #169c46;
+  --dark-bg: #121212;
+  --glass-bg: rgba(255, 255, 255, 0.08);
+  --glass-border: rgba(255, 255, 255, 0.1);
+  --text-main: #ffffff;
+  --text-sec: #b3b3b3;
+  --shadow-lg: 0 20px 50px rgba(0,0,0,0.5);
+  
+  display: block;
+  font-family: 'Montserrat', 'Segoe UI', sans-serif;
+  color: var(--text-main);
   min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
 }
 
-header {
-  background-color: #000;
+/* --- FONDO DINÁMICO --- */
+.background-layer {
+  position: fixed;
+  top: -10%; left: -10%; width: 120%; height: 120%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(80px) brightness(0.4);
+  z-index: -2;
+  transition: background-image 1s ease-in-out;
+}
+.backdrop-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: radial-gradient(circle at center, rgba(18,18,18,0.5) 0%, #121212 100%);
+  z-index: -1;
+}
+
+/* --- HEADER --- */
+.glass-header {
+  display: flex; justify-content: space-between; align-items: center;
   padding: 1rem 2rem;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid var(--glass-border);
+  position: sticky; top: 0; z-index: 100;
+}
+
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo-circle { 
+  width: 40px; height: 40px; background: var(--primary); 
+  border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;
+  box-shadow: 0 0 15px rgba(30, 215, 96, 0.4);
+}
+.brand h1 { font-size: 1.5rem; margin: 0; font-weight: 700; letter-spacing: -0.5px; }
+.highlight { color: var(--primary); }
+
+.user-badge { font-weight: 600; margin-right: 15px; }
+.btn-icon {
+  background: rgba(255,255,255,0.1); border: none; color: white;
+  width: 40px; height: 40px; border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.3s ease;
+}
+.btn-icon:hover { background: rgba(255,255,255,0.2); transform: rotate(90deg); }
+
+/* --- MAIN CONTENT --- */
+.main-content {
+  max-width: 800px; margin: 0 auto; padding: 30px 20px;
+}
+
+/* Connect Screen */
+.connect-screen {
+  height: 60vh; display: flex; align-items: center; justify-content: center;
+}
+.connect-card {
+  text-align: center; padding: 40px; max-width: 400px;
+  background: rgba(30, 30, 30, 0.6); backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border); border-radius: 20px;
+  box-shadow: var(--shadow-lg);
+}
+.icon-pulse { font-size: 3rem; margin-bottom: 20px; animation: pulse 2s infinite; }
+.spotify-logo-btn { height: 24px; margin-right: 10px; filter: invert(1); }
+.btn-primary {
+  background: var(--primary); color: #000; border: none; padding: 12px 30px;
+  border-radius: 30px; font-weight: 700; font-size: 1rem; cursor: pointer;
+  display: flex; align-items: center; margin: 20px auto 0;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn-primary:hover { transform: scale(1.05); box-shadow: 0 0 20px rgba(30,215,96,0.6); }
+
+/* --- NOW PLAYING (HERO) --- */
+.now-playing-glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(15px);
+  border: 1px solid var(--glass-border);
+  border-radius: 24px;
+  padding: 30px;
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  border-bottom: 1px solid #333;
+  gap: 30px;
+  box-shadow: var(--shadow-lg);
+  margin-bottom: 40px;
+  position: relative;
+  overflow: hidden;
 }
 
-h1 { color: #1ed760; margin: 0; font-size: 1.5rem; }
+.art-container {
+  position: relative; width: 180px; height: 180px; flex-shrink: 0;
+}
+.album-art, .album-placeholder {
+  width: 100%; height: 100%; border-radius: 12px; object-fit: cover;
+  position: relative; z-index: 2; box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+.album-placeholder { background: #222; display: flex; align-items: center; justify-content: center; font-size: 4rem; }
 
-.user-info { display: flex; align-items: center; gap: 15px; }
+/* Efecto Vinilo detrás */
+.vinyl-record {
+  position: absolute; top: 5px; right: -20px;
+  width: 170px; height: 170px; border-radius: 50%;
+  background: repeating-radial-gradient(#111 0, #111 2px, #333 3px, #333 4px);
+  z-index: 1; transition: transform 0.5s ease;
+}
+.vinyl-record.spinning { animation: spin 5s linear infinite; transform: translateX(40px); }
+.is-paused .vinyl-record { animation-play-state: paused; transform: translateX(0); }
 
-.btn-logout {
-  background: transparent; border: 1px solid #fff; color: #fff;
-  padding: 5px 15px; border-radius: 20px; cursor: pointer;
-  transition: all 0.2s;
+.track-info-large { flex: 1; z-index: 2; }
+.status-pill {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(0,0,0,0.4); padding: 6px 12px; border-radius: 20px;
+  font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; color: var(--primary);
+  margin-bottom: 15px; border: 1px solid rgba(30,215,96,0.3);
 }
-.btn-logout:hover { background: #fff; color: #000; }
+.dot { width: 8px; height: 8px; background: var(--primary); border-radius: 50%; }
+.dot.animate { animation: blink 1.5s infinite; }
 
-.dashboard-content { 
-  padding: 2rem;
-  max-width: 800px;
-  margin: 0 auto; 
-  text-align: center;
-}
+.hero-title { font-size: 2.2rem; margin: 0 0 10px; line-height: 1.1; }
+.hero-artist { font-size: 1.2rem; color: var(--text-sec); margin: 0; }
 
-/* --- ESTILOS SPOTIFY / BÚSQUEDA --- */
-.spotify-card {
-    background: #282828;
-    padding: 30px;
-    border-radius: 10px;
-    margin-bottom: 30px;
+.progress-bar-container {
+  height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px;
+  margin-top: 25px; overflow: hidden;
 }
-.btn-spotify {
-    background-color: #1ed760;
-    color: black;
-    font-weight: bold;
-    border: none;
-    padding: 12px 30px;
-    border-radius: 25px;
-    margin-top: 15px;
-    cursor: pointer;
-    font-size: 1rem;
-    transition: background 0.2s;
+.progress-bar {
+  height: 100%; background: var(--primary); width: 0%;
 }
-.btn-spotify:hover {
-    background-color: #2eef71;
-}
+.progress-bar.animating { animation: progress 180s linear forwards; } /* Simulación simple */
 
-.search-section {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 20px;
-    justify-content: center;
+/* --- SEARCH --- */
+.search-glass {
+  background: rgba(255,255,255,0.1);
+  border-radius: 50px; padding: 5px 10px 5px 25px;
+  display: flex; align-items: center; gap: 15px;
+  border: 1px solid var(--glass-border);
+  transition: background 0.3s, box-shadow 0.3s;
 }
+.search-glass:focus-within { background: rgba(255,255,255,0.15); box-shadow: 0 0 0 2px var(--primary); }
 .search-input {
-    padding: 12px;
-    width: 100%;
-    max-width: 400px;
-    border-radius: 25px;
-    border: 1px solid #444;
-    background: #333;
-    color: white;
-    font-size: 1rem;
+  flex: 1; background: transparent; border: none; color: white;
+  font-size: 1.1rem; padding: 10px 0; outline: none;
 }
 .btn-search {
-    background-color: #1ed760;
-    color: black;
-    font-weight: bold;
-    border: none;
-    padding: 0 25px;
-    border-radius: 25px;
-    cursor: pointer;
+  background: var(--primary); color: #000; border: none;
+  padding: 12px 30px; border-radius: 30px; font-weight: 700; cursor: pointer;
 }
 
-/* Resultados */
-.results-grid {
-  margin-top: 20px;
-  text-align: left;
+/* --- RESULTS OVERLAY --- */
+.results-overlay {
+  background: #181818; border-radius: 16px; padding: 20px;
+  margin-top: 20px; box-shadow: 0 10px 40px rgba(0,0,0,0.8);
+  border: 1px solid #333; position: relative; z-index: 10;
 }
-.song-card {
-  background: #282828;
-  padding: 10px 20px;
-  margin-bottom: 8px;
-  border-radius: 8px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-.song-info h5 { margin: 0; font-size: 1rem; }
-.song-info p { margin: 0; color: #b3b3b3; font-size: 0.85rem; }
+.glass-header-results { display: flex; justify-content: space-between; margin-bottom: 15px; color: var(--text-sec); }
+.btn-close { background: none; border: none; color: white; font-size: 1.5rem; cursor: pointer; }
 
-.btn-pay {
-    background-color: #000;
-    color: #1ed760;
-    border: 1px solid #1ed760;
-    padding: 8px 15px;
-    border-radius: 20px;
-    cursor: pointer;
-    font-weight: bold;
+.results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 15px; }
+.result-card {
+  background: #252525; border-radius: 10px; padding: 12px;
+  cursor: pointer; transition: transform 0.2s, background 0.2s;
+  display: flex; flex-direction: column; gap: 10px;
 }
-.queue-title {
-    margin-top: 40px;
-    display: block;
+.result-card:hover { background: #333; transform: translateY(-5px); }
+.result-img { width: 100%; aspect-ratio: 1; border-radius: 6px; object-fit: cover; }
+.r-title { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.r-artist { font-size: 0.85rem; color: var(--text-sec); }
+.result-action { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
+.price-tag { font-size: 0.8rem; color: var(--primary); background: rgba(30,215,96,0.1); padding: 2px 6px; border-radius: 4px; }
+.btn-add {
+  width: 28px; height: 28px; border-radius: 50%; background: var(--primary); color: #000;
+  border: none; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center;
 }
-.empty-state {
-    color: #b3b3b3;
-    padding: 20px;
-    border: 1px dashed #333;
-    border-radius: 8px;
+
+/* --- QUEUE --- */
+.section-title { margin: 40px 0 20px; font-size: 1.5rem; border-bottom: 1px solid #333; padding-bottom: 10px; }
+.empty-state-glass {
+  text-align: center; padding: 40px; background: rgba(255,255,255,0.02);
+  border-radius: 12px; border: 1px dashed #444; color: var(--text-sec);
+}
+.empty-icon { font-size: 3rem; margin-bottom: 10px; }
+
+.queue-card {
+  display: flex; align-items: center; padding: 15px 20px;
+  background: rgba(255,255,255,0.03); border-radius: 12px;
+  margin-bottom: 10px; border: 1px solid transparent;
+  transition: all 0.2s;
+}
+.queue-card:hover { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.1); transform: scale(1.01); }
+.q-index { color: var(--primary); font-family: monospace; font-size: 1.2rem; width: 40px; }
+.q-info { flex: 1; display: flex; flex-direction: column; }
+.q-title { font-weight: 600; font-size: 1.1rem; }
+.q-artist { color: var(--text-sec); font-size: 0.9rem; }
+.badge-wait { background: #333; color: #aaa; padding: 4px 10px; border-radius: 12px; font-size: 0.8rem; }
+
+/* --- ANIMACIONES --- */
+@keyframes spin { 100% { transform: rotate(360deg) translateX(40px); } } /* Nota: el translate debe mantenerse si queremos el efecto "salido" */
+@keyframes pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.7; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+@keyframes progress { from { width: 0%; } to { width: 100%; } }
+
+.fade-in { animation: fadeIn 0.5s ease-out; }
+.fade-in-up { animation: fadeInUp 0.4s ease-out; }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Responsive */
+@media (max-width: 600px) {
+  .now-playing-glass { flex-direction: column; text-align: center; }
+  .vinyl-record { display: none; }
+  .background-layer { display: none; } /* Mejor rendimiento en móviles */
 }
