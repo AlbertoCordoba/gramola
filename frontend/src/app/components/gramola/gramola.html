@@ -66,8 +66,12 @@
         <div class="search-glass">
           <span class="search-icon">🔍</span>
           <input type="text" [(ngModel)]="busqueda" (keyup.enter)="search()" 
+                 [disabled]="isSearching"
                  placeholder="Busca tu canción favorita..." class="search-input">
-          <button (click)="search()" class="btn-search">Buscar</button>
+          
+          <button (click)="search()" class="btn-search" [disabled]="isSearching">
+            {{ isSearching ? '...' : 'Buscar' }}
+          </button>
         </div>
       </section>
 
