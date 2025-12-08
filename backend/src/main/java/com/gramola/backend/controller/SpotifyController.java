@@ -34,9 +34,13 @@ public class SpotifyController {
     // Endpoint 3: Buscar canciones
     @GetMapping("/search")
     public ResponseEntity<?> search(@RequestParam String q) {
+        // LOGGING: Muestra que la petición de búsqueda ha llegado al backend
+        System.out.println("-> Petición de búsqueda recibida. Query: " + q); 
         try {
             return ResponseEntity.ok(spotifyService.searchTracks(q));
         } catch (Exception e) {
+            // LOGGING: Muestra si hay un error al procesar la búsqueda
+            System.err.println("-> Error procesando la búsqueda: " + e.getMessage());
             return ResponseEntity.status(401).body(Collections.singletonMap("error", e.getMessage()));
         }
     }

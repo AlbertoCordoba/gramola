@@ -10,31 +10,27 @@
   <main>
     <div class="dashboard-content">
       
-      <!-- CONEXIÓN -->
       <div *ngIf="!spotifyConnected" class="spotify-card">
         <h3>Conectar Música</h3>
         <button (click)="connectSpotify()" class="btn-spotify">Conectar con Spotify</button>
       </div>
       
-      <!-- BUSCADOR -->
       <div *ngIf="spotifyConnected" class="search-section">
         <input type="text" [(ngModel)]="busqueda" (keyup.enter)="search()" placeholder="Buscar canción..." class="search-input">
         <button (click)="search()" class="btn-search">Buscar</button>
       </div>
       
-      <!-- RESULTADOS -->
       <div *ngIf="searchResults.length > 0" class="results-grid">
         <h4>Resultados</h4>
         <div class="song-card" *ngFor="let track of searchResults">
           <div class="song-info">
             <h5>{{ track.name }}</h5>
-            <p>{{ track.artists[0].name }}</p>
+            <p>{{ track.artists[0].name }}</p> 
           </div>
           <button (click)="anadir(track)" class="btn-pay">Añadir (0.50 €)</button>
         </div>
       </div>
       
-      <!-- COLA DE REPRODUCCIÓN -->
       <div class="queue-section">
         <h3>Cola de Reproducción</h3>
         <div *ngIf="colaReproduccion.length === 0" class="empty-state">La cola está vacía.</div>

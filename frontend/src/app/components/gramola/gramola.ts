@@ -21,7 +21,7 @@ export class Gramola implements OnDestroy {
   usuario: any = null;
   spotifyConnected: boolean = false;
   busqueda: string = '';
-  searchResults: any[] = [];
+  searchResults: any[] = []; // Array donde se guardan los resultados
   colaReproduccion: any[] = [];
   
   // Variables del Reproductor
@@ -67,14 +67,23 @@ export class Gramola implements OnDestroy {
   }
 
   search() {
+    // La búsqueda solo se realiza con más de 2 caracteres
     if (this.busqueda.length > 2) {
       this.spotifyService.searchTracks(this.busqueda).subscribe({
         next: (res: any) => {
-          // Filtrar solo canciones con preview_url
-          this.searchResults = res.tracks.items.filter((track: any) => track.preview_url);
+          console.log('Respuesta completa de Spotify (FRONTEND):', res);
+
+          // Asignamos TODOS los resultados (sin filtro de preview_url)
+          this.searchResults = res.tracks.items;
+
+          console.log(`Canciones asignadas y listas para mostrar: ${this.searchResults.length}`);
         },
-        error: (err) => console.error(err)
+        error: (err) => {
+          console.error('Error en búsqueda de Spotify (FRONTEND):', err);
+        }
       });
+    } else {
+       console.log('Escribe al menos 3 caracteres para buscar.');
     }
   }
 
@@ -83,8 +92,8 @@ export class Gramola implements OnDestroy {
     if(!confirm(`¿Pagar 0.50€ por "${track.name}"?`)) return;
 
     // SOLUCIÓN AL ERROR: Convertimos el ID a NUMBER para el servicio
-  console.log('Track seleccionado:', track);
-  const barIdNumerico = Number(this.usuario.id); 
+    console.log('Track seleccionado:', track);
+    const barIdNumerico = Number(this.usuario.id); 
 
     this.gramolaService.anadirCancion(track, barIdNumerico).subscribe({
       next: () => {

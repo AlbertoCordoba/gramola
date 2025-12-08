@@ -7,7 +7,7 @@ import { Observable } from 'rxjs';
 })
 export class SpotifyConnectService {
   private http = inject(HttpClient);
-  private apiUrl = 'http://localhost:8080/api/spotify';
+  private apiUrl = 'http://127.0.0.1:8080/api/spotify';
 
   // Llama al backend para obtener la URL de login de Spotify
   getAuthUrl(): Observable<{ url: string }> {
