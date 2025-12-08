@@ -1,4 +1,4 @@
-import { Component, inject, OnDestroy, OnInit, NgZone } from '@angular/core';
+import { Component, inject, OnDestroy, OnInit, NgZone, ChangeDetectorRef } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -27,6 +27,7 @@ export class Gramola implements OnInit, OnDestroy {
   private spotifyService = inject(SpotifyConnectService);
   private gramolaService = inject(GramolaService);
   private ngZone = inject(NgZone);
+  private cdr = inject(ChangeDetectorRef); // INYECCIÓN NECESARIA
 
   usuario: any = null;
   spotifyConnected: boolean = false;
@@ -37,6 +38,7 @@ export class Gramola implements OnInit, OnDestroy {
   player: any;
   deviceId: string = '';
   currentTrack: any = null;
+  cancionSonando: any = null; // Guardamos la canción de nuestra BD
   isPaused: boolean = false;
   
   private pollingInterval: any;
@@ -131,7 +133,7 @@ export class Gramola implements OnInit, OnDestroy {
             this.wasPlaying = true;
         }
 
-        // Lógica de fin de canción: Se pausa, vuelve a 0 y estaba sonando
+        // Lógica de fin de canción
         if (state.paused && state.position === 0 && this.wasPlaying) {
             if (!this.cambiandoCancion) {
                 console.log("Canción terminada. Siguiente...");
@@ -139,6 +141,9 @@ export class Gramola implements OnInit, OnDestroy {
                 this.siguienteCancion();
             }
         }
+
+        // ESTA LÍNEA ES LA CLAVE: Forzamos a Angular a repintar la vista
+        this.cdr.detectChanges();
       });
     });
 
@@ -167,7 +172,6 @@ export class Gramola implements OnInit, OnDestroy {
   anadir(track: any) {
     this.gramolaService.anadirCancion(track, Number(this.usuario.id)).subscribe({
       next: () => {
-        // Al añadir, cerramos búsqueda y refrescamos
         this.busqueda = '';
         this.searchResults = [];
         this.cargarCola(); 
@@ -205,7 +209,12 @@ export class Gramola implements OnInit, OnDestroy {
     this.spotifyService.playTrack(cancion.spotifyId, this.deviceId, this.usuario.id).subscribe({
       next: () => {
         console.log("Reproduciendo:", cancion.titulo);
+        
+        // Guardamos referencia para finalizarla correctamente después
+        this.cancionSonando = cancion;
+
         this.gramolaService.actualizarEstado(Number(cancion.id), 'SONANDO').subscribe();
+        
         this.cambiandoCancion = false;
         this.wasPlaying = false; 
       },
@@ -222,22 +231,18 @@ export class Gramola implements OnInit, OnDestroy {
     if (this.cambiandoCancion) return;
     this.cambiandoCancion = true;
 
-    const current = this.colaReproduccion[0];
+    // Finalizamos la que estaba sonando (si existe)
+    if (this.cancionSonando) {
+        this.gramolaService.actualizarEstado(Number(this.cancionSonando.id), 'TERMINADA').subscribe();
+    }
 
-    this.gramolaService.actualizarEstado(Number(current.id), 'TERMINADA').subscribe(() => {
-        this.gramolaService.obtenerCola(Number(this.usuario.id)).subscribe((res: any) => {
-            this.ngZone.run(() => {
-              this.colaReproduccion = res;
-              this.currentTrack = null; 
+    // Tomamos la primera de la cola
+    const siguiente = this.colaReproduccion[0];
+    
+    // Actualizamos la UI localmente al instante para evitar rebotes visuales
+    this.colaReproduccion.shift(); 
 
-              if (this.colaReproduccion.length > 0) {
-                  this.reproducir(this.colaReproduccion[0]);
-              } else {
-                  this.cambiandoCancion = false;
-              }
-            });
-        });
-    });
+    this.reproducir(siguiente);
   }
 
   logout() {
