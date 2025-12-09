@@ -10,7 +10,13 @@
       <div class="logo-circle">🎵</div>
       <h1>Gramola<span class="highlight">Virtual</span></h1>
     </div>
+    
     <div class="user-info" *ngIf="usuario">
+      <div class="firma-badge" *ngIf="usuario.firmaImagen">
+        <span class="label-firma">Propietario:</span>
+        <img [src]="'data:image/png;base64,' + usuario.firmaImagen" alt="Firma" class="img-firma">
+      </div>
+
       <span class="user-badge">{{ usuario.nombre }}</span>
       <button (click)="logout()" class="btn-icon" title="Cerrar sesión">
         <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -19,7 +25,6 @@
   </header>
 
   <main class="main-content">
-    
     <div *ngIf="!spotifyConnected" class="connect-screen fade-in">
       <div class="glass-card connect-card">
         <div class="icon-pulse">🔌</div>

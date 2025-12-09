@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Base64; // IMPORTANTE
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,35 +23,23 @@ public class BarService {
 
     @Autowired
     private BarRepository barRepository;
-
     @Autowired
     private ConfiguracionPreciosRepository preciosRepository;
-
     @Autowired
     private EmailService emailService;
 
-    // --- CORRECCIÓN AQUÍ ---
+    // --- PRECIOS ---
     public Map<String, BigDecimal> obtenerPrecios() {
         Map<String, BigDecimal> precios = new HashMap<>();
         List<ConfiguracionPrecios> lista = preciosRepository.findAll();
-
-        System.out.println("--- LEYENDO PRECIOS (POR CLAVE) ---");
         for (ConfiguracionPrecios p : lista) {
-            // Usamos getClave() porque es donde está el dato real ('SUSCRIPCION_MENSUAL')
-            String claveLimpia = p.getClave() != null ? p.getClave().trim() : "NULO";
-            BigDecimal valor = p.getValor();
-            
-            System.out.println("Cargado: " + claveLimpia + " -> " + valor);
-            
-            if (p.getClave() != null) {
-                precios.put(claveLimpia, valor);
-            }
+            String clave = p.getClave() != null ? p.getClave().trim() : "SIN_CLAVE";
+            if (p.getClave() != null) precios.put(clave, p.getValor());
         }
-        System.out.println("-----------------------------------");
-        
         return precios;
     }
 
+    // --- REGISTRO CON FIRMA ---
     public void registrarBar(BarRegistroDTO datos) throws Exception {
         if (barRepository.existsByEmail(datos.getEmail())) throw new Exception("El email ya existe");
         if (!datos.getPassword().equals(datos.getConfirmPassword())) throw new Exception("Las contraseñas no coinciden");
@@ -62,6 +51,18 @@ public class BarService {
         bar.setLatitud(datos.getLatitud());
         bar.setLongitud(datos.getLongitud());
         
+        // PROCESAR FIRMA
+        if (datos.getFirmaBase64() != null && !datos.getFirmaBase64().isEmpty()) {
+            try {
+                // Formato esperado: "data:image/png;base64,iVBOR..." -> Quitamos la cabecera
+                String base64Image = datos.getFirmaBase64().split(",")[1];
+                byte[] imageBytes = Base64.getDecoder().decode(base64Image);
+                bar.setFirmaImagen(imageBytes);
+            } catch (Exception e) {
+                System.err.println("Error guardando firma: " + e.getMessage());
+            }
+        }
+        
         String token = UUID.randomUUID().toString();
         bar.setTokenConfirmacion(token);
         bar.setActivo(false);
@@ -70,6 +71,7 @@ public class BarService {
         emailService.sendWelcomeEmail(bar.getEmail(), token);
     }
 
+    // --- CONFIRMACIÓN ---
     public void confirmarCuenta(String token) throws Exception {
         Bar bar = barRepository.findByTokenConfirmacion(token)
                 .orElseThrow(() -> new Exception("Token inválido"));
@@ -77,17 +79,19 @@ public class BarService {
         barRepository.save(bar);
     }
 
+    // --- LOGIN ---
     public Bar login(BarLoginDTO datos) throws Exception {
         Bar bar = barRepository.findByEmail(datos.getEmail())
                 .orElseThrow(() -> new Exception("Usuario no encontrado"));
 
         if (!bar.getPassword().equals(datos.getPassword())) throw new Exception("Contraseña incorrecta");
-        if (bar.getTokenConfirmacion() != null) throw new Exception("Debes confirmar tu email primero.");
-        if (!bar.isActivo()) throw new Exception("Debes completar el pago de la suscripción.");
+        if (bar.getTokenConfirmacion() != null) throw new Exception("Confirma tu email primero.");
+        if (!bar.isActivo()) throw new Exception("Completa el pago de suscripción.");
 
         return bar;
     }
 
+    // --- RECUPERACIÓN ---
     public void solicitarRecuperacion(String email) throws Exception {
         Optional<Bar> barOpt = barRepository.findByEmail(email);
         if (barOpt.isPresent()) {
@@ -111,11 +115,7 @@ public class BarService {
         barRepository.save(bar);
     }
 
-    public void activarSuscripcion(String email, String tipo) throws Exception {
-        Bar bar = barRepository.findByEmail(email).orElseThrow(() -> new Exception("Usuario no encontrado"));
-        activarSuscripcion(bar.getId(), tipo);
-    }
-
+    // --- SUSCRIPCIÓN ---
     public void activarSuscripcion(Long barId, String tipo) throws Exception {
         Bar bar = barRepository.findById(barId).orElseThrow(() -> new Exception("Bar no encontrado"));
         bar.setTipoSuscripcion(tipo);
@@ -123,5 +123,10 @@ public class BarService {
         bar.setFechaFinSuscripcion(tipo.equals("SUSCRIPCION_ANUAL") ? 
             java.time.LocalDate.now().plusYears(1) : java.time.LocalDate.now().plusMonths(1));
         barRepository.save(bar);
+    }
+    
+    public void activarSuscripcion(String email, String tipo) throws Exception {
+        Bar bar = barRepository.findByEmail(email).orElseThrow(() -> new Exception("Usuario no encontrado"));
+        activarSuscripcion(bar.getId(), tipo);
     }
 }

@@ -4,7 +4,6 @@
     <p>Únete a Gramola Virtual</p>
 
     <form (ngSubmit)="onRegistro()">
-      
       <div class="form-group">
         <label>Nombre del Bar</label>
         <input type="text" [(ngModel)]="registroData.nombre" name="nombre" placeholder="Bar Manolo" required>
@@ -26,14 +25,19 @@
         </div>
       </div>
 
-      <!-- Botón del Bonus de Geolocalización -->
       <div class="form-group location-box">
         <label>Ubicación</label>
         <div class="geo-inputs">
-          <input type="number" [(ngModel)]="registroData.latitud" name="latitud" placeholder="Lat" step="any">
-          <input type="number" [(ngModel)]="registroData.longitud" name="longitud" placeholder="Long" step="any">
+          <input type="number" [(ngModel)]="registroData.latitud" name="latitud" placeholder="Lat">
+          <input type="number" [(ngModel)]="registroData.longitud" name="longitud" placeholder="Long">
         </div>
-        <button type="button" class="btn-geo" (click)="obtenerUbicacion()">📍 Detectar Ubicación</button>
+        <button type="button" class="btn-geo" (click)="obtenerUbicacion()">📍 Detectar</button>
+      </div>
+
+      <div class="form-group canvas-container">
+        <label class="canvas-title">Firma del Propietario</label>
+        <canvas #firmaCanvas width="400" height="150"></canvas>
+        <button type="button" class="btn-clear" (click)="limpiarFirma()">Borrar Firma</button>
       </div>
 
       <div *ngIf="errorMessage" class="msg error">{{ errorMessage }}</div>

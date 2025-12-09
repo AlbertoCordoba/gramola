@@ -1,31 +1,12 @@
-.registro-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 100vh;
-  padding: 20px;
-}
+.registro-container { display: flex; justify-content: center; align-items: center; min-height: 100vh; padding: 20px; }
 
 .registro-card {
-  background: var(--card-bg);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid var(--border-glass);
-  padding: 2.5rem;
-  border-radius: 16px;
-  box-shadow: var(--shadow-lg);
-  width: 100%;
-  max-width: 500px;
-  text-align: center;
-  color: white;
+  background: var(--card-bg); backdrop-filter: blur(10px);
+  border: 1px solid var(--border-glass); padding: 2.5rem;
+  border-radius: 16px; width: 100%; max-width: 500px; text-align: center; color: white;
 }
 
-h2 {
-  color: var(--primary);
-  margin-bottom: 0.5rem;
-  font-size: 2rem;
-}
-
+h2 { color: var(--primary); margin-bottom: 0.5rem; font-size: 2rem; }
 p { color: var(--text-sec); margin-bottom: 2rem; }
 
 .form-group { margin-bottom: 1.2rem; text-align: left; }
@@ -33,53 +14,41 @@ p { color: var(--text-sec); margin-bottom: 2rem; }
 .half { width: 50%; }
 
 label { color: var(--text-sec); margin-bottom: 0.5rem; display: block; }
+input { width: 100%; padding: 12px; box-sizing: border-box; }
 
-input {
-  width: 100%;
-  padding: 12px;
-  box-sizing: border-box;
+/* CANVAS STYLES */
+.canvas-container {
+  background: rgba(255, 255, 255, 0.05); padding: 10px; border-radius: 8px;
+  text-align: center; border: 1px solid var(--border-glass);
 }
+.canvas-title { font-size: 0.9rem; margin-bottom: 5px; }
+canvas {
+  background: white; border-radius: 4px; cursor: crosshair;
+  touch-action: none; width: 100%; max-width: 400px;
+}
+.btn-clear {
+  background: transparent; border: 1px solid #ff6b6b; color: #ff6b6b;
+  padding: 5px 10px; border-radius: 4px; margin-top: 5px; font-size: 0.8rem; cursor: pointer;
+}
+.btn-clear:hover { background: rgba(255, 107, 107, 0.1); }
 
 .location-box {
-  background: rgba(255, 255, 255, 0.03);
-  padding: 15px;
-  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.03); padding: 15px; border-radius: 8px;
   border: 1px dashed var(--border-glass);
-  margin-top: 10px;
 }
-
 .geo-inputs { display: flex; gap: 10px; margin-bottom: 10px; }
-
-.btn-geo {
-  width: 100%;
-  padding: 10px;
-  background-color: transparent;
-  color: var(--primary);
-  border: 1px solid var(--primary);
-  border-radius: 6px;
-  cursor: pointer;
-  transition: 0.3s;
-}
-.btn-geo:hover { background: rgba(30, 215, 96, 0.1); }
+.btn-geo { width: 100%; padding: 10px; background: transparent; color: var(--primary); border: 1px solid var(--primary); border-radius: 6px; cursor: pointer; }
 
 .btn-submit {
-  width: 100%;
-  padding: 14px;
-  background-color: var(--primary);
-  color: #000;
-  border: none;
-  border-radius: 30px;
-  cursor: pointer;
-  font-weight: 700;
-  font-size: 1.1rem;
-  margin-top: 1.5rem;
-  transition: transform 0.2s;
+  width: 100%; padding: 14px; background: var(--primary); color: #000;
+  border: none; border-radius: 30px; cursor: pointer; font-weight: 700;
+  margin-top: 1.5rem; transition: transform 0.2s;
 }
-.btn-submit:hover { transform: scale(1.02); background-color: #1fdf64; }
+.btn-submit:hover { transform: scale(1.02); }
 
 .msg { padding: 12px; border-radius: 6px; margin-top: 15px; }
-.error { background-color: rgba(255, 87, 87, 0.15); color: #ff6b6b; border: 1px solid rgba(255, 87, 87, 0.3); }
-.success { background-color: rgba(30, 215, 96, 0.15); color: var(--primary); border: 1px solid var(--primary); }
+.error { background: rgba(255, 87, 87, 0.15); color: #ff6b6b; }
+.success { background: rgba(30, 215, 96, 0.15); color: var(--primary); }
 
 .footer-links { margin-top: 2rem; color: var(--text-sec); }
 a { color: white; font-weight: bold; }
