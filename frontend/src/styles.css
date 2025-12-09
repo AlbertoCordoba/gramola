@@ -1,1 +1,44 @@
-/* You can add global styles to this file, and also import other style files */
+/* --- VARIABLES GLOBALES (Tema Dark Spotify) --- */
+:root {
+  --primary: #1ed760;       /* Verde Spotify */
+  --primary-dark: #169c46;
+  --bg-color: #121212;      /* Fondo muy oscuro */
+  --card-bg: rgba(255, 255, 255, 0.05); /* Cristal */
+  --input-bg: rgba(255, 255, 255, 0.1);
+  --text-main: #ffffff;
+  --text-sec: #b3b3b3;
+  --border-glass: rgba(255, 255, 255, 0.1);
+  --shadow-lg: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+}
+
+/* Reset básico para asegurar fondo oscuro en toda la app */
+body, html {
+  height: 100%;
+  margin: 0;
+  background-color: var(--bg-color);
+  background-image: radial-gradient(circle at 50% -20%, #2a2a2a, #121212); /* Sutil degradado */
+  color: var(--text-main);
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+/* Clases de utilidad para Inputs y Botones */
+input {
+  background: var(--input-bg) !important;
+  border: 1px solid var(--border-glass) !important;
+  color: white !important;
+  border-radius: 4px;
+}
+
+input:focus {
+  outline: none;
+  border-color: var(--primary) !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+a {
+  color: var(--text-sec);
+  transition: 0.3s;
+}
+a:hover {
+  color: var(--primary);
+}

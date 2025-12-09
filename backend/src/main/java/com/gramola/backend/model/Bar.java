@@ -5,11 +5,10 @@ import lombok.Data;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
-@Data // Lombok genera automáticamente getters, setters y toString
-@Entity // Esto le dice a Spring que esta clase es una tabla de la BD
-@Table(name = "bares") // El nombre exacto de la tabla en MySQL
+@Data
+@Entity
+@Table(name = "bares")
 public class Bar {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -21,35 +20,39 @@ public class Bar {
     private String email;
 
     @Column(nullable = false)
-    private String password;
+    private String password; // SE GUARDA EN TEXTO PLANO (SIN ENCRIPTAR)
 
-    private boolean activo = false;
+    private boolean activo = false; // False hasta que verifique Y pague
 
     @Column(name = "token_confirmacion")
     private String tokenConfirmacion;
+    
+    // RECUPERACIÓN DE CONTRASEÑA
+    @Column(name = "reset_password_token")
+    private String resetPasswordToken;
 
+    @Column(name = "reset_password_expires")
+    private LocalDateTime resetPasswordExpires;
+
+    // SUSCRIPCIÓN
     @Column(name = "tipo_suscripcion")
-    private String tipoSuscripcion; // 'MENSUAL', 'ANUAL', etc.
+    private String tipoSuscripcion; // 'SUSCRIPCION_MENSUAL' o 'SUSCRIPCION_ANUAL'
 
     @Column(name = "fecha_fin_suscripcion")
     private LocalDate fechaFinSuscripcion;
 
-    // Campos para los puntos extra
     private Double latitud;
     private Double longitud;
 
-    @Lob // Indica que es un objeto grande (BLOB) para la imagen
+    @Lob
     @Column(name = "firma_imagen", columnDefinition = "LONGBLOB")
     private byte[] firmaImagen;
 
-    // --- INTEGRACIÓN REAL CON SPOTIFY ---
-    // Guardamos los tokens aquí para que persistan tras reinicios
+    // SPOTIFY
     @Column(name = "spotify_access_token", length = 2048)
     private String spotifyAccessToken;
-
     @Column(name = "spotify_refresh_token", length = 2048)
     private String spotifyRefreshToken;
-
     @Column(name = "spotify_token_expires_at")
     private LocalDateTime spotifyTokenExpiresAt;
 }
