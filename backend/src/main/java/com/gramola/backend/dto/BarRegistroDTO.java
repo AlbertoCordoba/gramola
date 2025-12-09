@@ -8,7 +8,8 @@ public class BarRegistroDTO {
     private String email;
     private String password;
     private String confirmPassword;
-    // Opcionales para puntos extra
     private Double latitud;
     private Double longitud;
+    // NUEVO CAMPO: Firma en formato Base64
+    private String firmaBase64;
 }

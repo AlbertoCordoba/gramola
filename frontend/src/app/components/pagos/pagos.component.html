@@ -1,0 +1,30 @@
+<div class="container">
+  <h2>Elige tu Suscripción</h2>
+  <p class="subtitle">Verifica tu identidad e inicia tu plan.</p>
+  
+  <div class="auth-confirm glass-card-mini">
+    <label>Confirma tu Email:</label>
+    <input type="email" [(ngModel)]="emailUsuario" placeholder="ejemplo@bar.com">
+  </div>
+
+  <p *ngIf="cargando" class="loading">Cargando precios...</p>
+  <p *ngIf="errorMensaje" class="error-msg">{{ errorMensaje }}</p>
+
+  <div class="pricing-grid" *ngIf="!cargando && !errorMensaje">
+    
+    <div class="card glass-card">
+      <h3>Mensual</h3>
+      <p class="price">{{ precios?.SUSCRIPCION_MENSUAL | number:'1.2-2' }} € <span class="period">/ mes</span></p>
+      <button (click)="pagar('SUSCRIPCION_MENSUAL')">Elegir Mensual</button>
+    </div>
+
+    <div class="card glass-card featured">
+      <div class="badge">MEJOR VALOR</div>
+      <h3>Anual</h3>
+      <p class="price">{{ precios?.SUSCRIPCION_ANUAL | number:'1.2-2' }} € <span class="period">/ año</span></p>
+      <p class="saving">¡Ahorra dinero!</p>
+      <button (click)="pagar('SUSCRIPCION_ANUAL')" class="btn-highlight">Elegir Anual</button>
+    </div>
+
+  </div>
+</div>
