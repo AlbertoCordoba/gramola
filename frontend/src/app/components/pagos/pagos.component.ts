@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { FormsModule } from '@angular/forms';
+import { PagoStateService } from '../../services/pago-state.service';
 
 @Component({
   selector: 'app-pagos',
@@ -15,6 +16,8 @@ export class PagosComponent implements OnInit {
   private http = inject(HttpClient);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  // Inyectamos el servicio de estado
+  private pagoState = inject(PagoStateService);
   
   precios: any = {};
   emailUsuario: string = '';
@@ -24,7 +27,7 @@ export class PagosComponent implements OnInit {
   ngOnInit() {
     this.route.queryParams.subscribe(params => {
       if (params['verificado']) {
-        console.log("Usuario verificado, esperando selección de pago.");
+        console.log("Usuario verificado.");
       }
     });
     this.cargarPrecios();
@@ -33,7 +36,6 @@ export class PagosComponent implements OnInit {
   cargarPrecios() {
     this.http.get('http://localhost:8080/api/bares/precios').subscribe({
       next: (res: any) => {
-        // Normalizamos claves a mayúsculas
         const preciosNormalizados: any = {};
         for (const key in res) {
             if (res[key]) {
@@ -63,15 +65,18 @@ export class PagosComponent implements OnInit {
       return;
     }
 
-    this.http.post('http://localhost:8080/api/bares/suscripcion', {
-      email: this.emailUsuario,
-      tipo: tipo
-    }).subscribe({
-      next: () => {
-        alert('¡Suscripción activada! Ya puedes iniciar sesión.');
-        this.router.navigate(['/login']);
-      },
-      error: (err) => alert('Error: ' + (err.error?.error || 'No se pudo activar.'))
+    // Configurar los datos para la pasarela
+    this.pagoState.setPago({
+      concepto: tipo === 'SUSCRIPCION_MENSUAL' ? 'Suscripción Mensual' : 'Suscripción Anual',
+      precio: this.precios[tipo],
+      tipo: 'SUSCRIPCION',
+      payload: {
+        email: this.emailUsuario,
+        tipo: tipo
+      }
     });
+
+    // Redirigir a la pantalla de pago
+    this.router.navigate(['/pasarela']);
   }
 }

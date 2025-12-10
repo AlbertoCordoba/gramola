@@ -10,7 +10,7 @@
   <p *ngIf="cargando" class="loading">Cargando precios...</p>
   <p *ngIf="errorMensaje" class="error-msg">{{ errorMensaje }}</p>
 
-  <div class="pricing-grid" *ngIf="!cargando && !errorMensaje">
+  <div class="pricing-grid" *ngIf="!cargando">
     
     <div class="card glass-card">
       <h3>Mensual</h3>

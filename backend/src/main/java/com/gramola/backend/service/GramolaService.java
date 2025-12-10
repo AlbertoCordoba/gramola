@@ -18,13 +18,26 @@ public class GramolaService {
 
     @Autowired
     private CancionSolicitadaRepository cancionRepository;
-
     @Autowired
     private PagosRepository pagosRepository;
+    
+    // INYECCIÓN DEL SERVICIO DE PAGOS
+    @Autowired
+    private MockPaymentService paymentService;
 
     @Transactional
     public CancionSolicitada anadirCancion(Map<String, Object> datos) {
-        // La ID del bar se convierte de String (JSON) a Long (Java)
+        // 1. PROCESAR PAGO (0.50€)
+        boolean simularError = datos.containsKey("simularError") ? (boolean) datos.get("simularError") : false;
+        
+        try {
+            paymentService.procesarPago(simularError);
+        } catch (Exception e) {
+            // Lanzamos RuntimeException para que @Transactional haga rollback
+            throw new RuntimeException(e.getMessage());
+        }
+
+        // 2. GUARDAR CANCIÓN (Solo si el pago fue bien)
         Long barId = Long.valueOf(datos.get("barId").toString());
         
         CancionSolicitada cancion = new CancionSolicitada();
@@ -32,33 +45,25 @@ public class GramolaService {
         cancion.setSpotifyId((String) datos.get("spotifyId"));
         cancion.setTitulo((String) datos.get("titulo"));
         cancion.setArtista((String) datos.get("artista"));
-        // ACEPTAMOS Y GUARDAMOS LA URL DE AUDIO
         cancion.setPreviewUrl((String) datos.get("previewUrl"));
+        
         Object duracionMsObj = datos.get("duracionMs");
-        if (duracionMsObj != null) {
-            if (duracionMsObj instanceof Number) {
-                cancion.setDuracionMs(((Number) duracionMsObj).intValue());
-            } else {
-                try {
-                    cancion.setDuracionMs(Integer.parseInt(duracionMsObj.toString()));
-                } catch (NumberFormatException e) {
-                    cancion.setDuracionMs(0);
-                }
-            }
+        if (duracionMsObj instanceof Number) {
+            cancion.setDuracionMs(((Number) duracionMsObj).intValue());
         } else {
             cancion.setDuracionMs(0);
         }
-        cancion.setEstado("COLA");
         
+        cancion.setEstado("COLA");
         cancion = cancionRepository.save(cancion);
 
+        // 3. REGISTRAR PAGO EN HISTÓRICO
         Pagos pago = new Pagos();
         pago.setBarId(barId);
         pago.setCancionId(cancion.getId());
         pago.setConcepto("PAGO_CANCION");
         pago.setMonto(new BigDecimal("0.50"));
         pago.setFechaPago(LocalDateTime.now());
-        
         pagosRepository.save(pago);
 
         return cancion;
@@ -68,7 +73,6 @@ public class GramolaService {
         return cancionRepository.findByBarIdAndEstadoOrderByFechaSolicitudAsc(barId, "COLA");
     }
 
-    // NUEVO: Método para cambiar estado (ej: cuando termina de sonar)
     @Transactional
     public void actualizarEstado(Long id, String estado) {
         CancionSolicitada c = cancionRepository.findById(id).orElseThrow();

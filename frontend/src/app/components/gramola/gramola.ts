@@ -5,6 +5,9 @@ import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';
 import { SpotifyConnectService } from '../../services/spotify.service';
 import { GramolaService } from '../../services/gramola.service';
+import { PagoStateService } from '../../services/pago-state.service';
+// IMPORTAMOS EL COMPONENTE DE PAGO
+import { PasarelaPagoComponent } from '../pasarela-pago/pasarela-pago.component';
 
 declare global {
   interface Window { 
@@ -16,36 +19,37 @@ declare global {
 @Component({
   selector: 'app-gramola',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PasarelaPagoComponent], // <--- AÑADIR AQUÍ
   templateUrl: './gramola.html',
   styleUrl: './gramola.css'
 })
 export class Gramola implements OnInit, OnDestroy {
+  // ... Inyecciones iguales ...
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private http = inject(HttpClient);
   private spotifyService = inject(SpotifyConnectService);
   private gramolaService = inject(GramolaService);
   private ngZone = inject(NgZone);
-  private cdr = inject(ChangeDetectorRef); // Inyección para forzar refresco de vista
+  private cdr = inject(ChangeDetectorRef);
+  private pagoState = inject(PagoStateService);
 
+  // ... Variables iguales ...
   usuario: any = null;
   spotifyConnected: boolean = false;
-  
-  // Variables de Búsqueda
   busqueda: string = '';
-  isSearching: boolean = false; // Nueva variable para controlar el estado del botón
-  searchResults: any[] = []; 
-  
-  // Variables de Cola y Reproducción
+  isSearching: boolean = false;
+  searchResults: any[] = [];
   colaReproduccion: any[] = [];
   player: any;
   deviceId: string = '';
-  
-  currentTrack: any = null;    // Info que viene del SDK de Spotify
-  cancionSonando: any = null;  // Info de nuestra BD (para tener el ID y marcarla terminada)
+  currentTrack: any = null;
+  cancionSonando: any = null;
   isPaused: boolean = false;
   
+  // NUEVA VARIABLE PARA EL MODAL
+  showPaymentModal: boolean = false;
+
   private pollingInterval: any;
   private cambiandoCancion: boolean = false;
   private wasPlaying: boolean = false; 
@@ -60,6 +64,7 @@ export class Gramola implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
+    // ... Código igual que antes ...
     this.route.queryParams.subscribe((params: any) => {
       if (params['status'] === 'success') {
         this.spotifyConnected = true;
@@ -79,16 +84,15 @@ export class Gramola implements OnInit, OnDestroy {
     }
   }
 
+  // ... initSpotifySDK, requestTokenAndConnect, initializePlayer, connectSpotify IGUALES ...
+  // ... Copia el código que ya tenías para estas funciones ...
+  
   initSpotifySDK() {
     if (window.Spotify) {
       this.requestTokenAndConnect();
       return;
     }
-
-    window.onSpotifyWebPlaybackSDKReady = () => {
-      this.requestTokenAndConnect();
-    };
-
+    window.onSpotifyWebPlaybackSDKReady = () => { this.requestTokenAndConnect(); };
     if (!document.getElementById('spotify-player-script')) {
       const script = document.createElement('script');
       script.id = 'spotify-player-script';
@@ -116,7 +120,6 @@ export class Gramola implements OnInit, OnDestroy {
       getOAuthToken: (cb: (token: string) => void) => { cb(token); },
       volume: 0.5
     });
-
     this.player.addListener('ready', ({ device_id }: any) => {
       this.ngZone.run(() => {
         console.log('Player Listo ID:', device_id);
@@ -126,32 +129,21 @@ export class Gramola implements OnInit, OnDestroy {
         }
       });
     });
-
     this.player.addListener('player_state_changed', (state: any) => {
       this.ngZone.run(() => {
         if (!state) return;
-        
         this.currentTrack = state.track_window.current_track;
         this.isPaused = state.paused;
-        
-        if (!state.paused) {
-            this.wasPlaying = true;
-        }
-
-        // Lógica de fin de canción: Se pausa, vuelve a 0 y estaba sonando
+        if (!state.paused) this.wasPlaying = true;
         if (state.paused && state.position === 0 && this.wasPlaying) {
             if (!this.cambiandoCancion) {
-                console.log("Canción terminada. Siguiente...");
                 this.wasPlaying = false; 
                 this.siguienteCancion();
             }
         }
-
-        // IMPORTANTE: Forzamos a Angular a actualizar la vista inmediatamente
         this.cdr.detectChanges();
       });
     });
-
     this.player.connect();
   }
 
@@ -162,52 +154,67 @@ export class Gramola implements OnInit, OnDestroy {
     });
   }
 
-  // --- FUNCIÓN DE BÚSQUEDA MEJORADA ---
   search() {
-    // 1. Validación simple
-    if (!this.busqueda || this.busqueda.trim().length <= 2) {
-      console.warn("Escribe al menos 3 letras para buscar.");
-      return;
-    }
-
-    // 2. Feedback visual inmediato
+    if (!this.busqueda || this.busqueda.trim().length <= 2) return;
     this.isSearching = true; 
-    this.searchResults = []; // Limpiamos resultados anteriores
-
+    this.searchResults = []; 
     this.spotifyService.searchTracks(this.busqueda, this.usuario.id).subscribe({
       next: (res: any) => {
         this.ngZone.run(() => {
           this.searchResults = res.tracks.items;
           this.isSearching = false;
-          // Forzamos actualización para mostrar resultados ya
           this.cdr.detectChanges(); 
         });
       },
       error: (err: any) => {
-        console.error('Error en búsqueda:', err);
         this.isSearching = false;
         this.cdr.detectChanges();
       }
     });
   }
 
+  // --- MODIFICADO: ABRIR MODAL EN LUGAR DE NAVEGAR ---
   anadir(track: any) {
-    this.gramolaService.anadirCancion(track, Number(this.usuario.id)).subscribe({
-      next: () => {
-        this.busqueda = '';
-        this.searchResults = [];
-        this.cargarCola(); 
-      },
-      error: (err: any) => console.error(err)
+    const previewUrl = track.preview_url || track.previewUrl || '';
+    
+    // Configuramos los datos en el servicio (igual que antes)
+    this.pagoState.setPago({
+      concepto: `Canción: ${track.name}`,
+      precio: 0.50,
+      tipo: 'CANCION',
+      payload: {
+        barId: Number(this.usuario.id),
+        spotifyId: track.id,
+        titulo: track.name,
+        artista: track.artists[0].name,
+        previewUrl: previewUrl,
+        duracionMs: track.duration_ms || 0
+      }
     });
+
+    // En vez de router.navigate, activamos el modal
+    this.showPaymentModal = true;
   }
 
+  // --- CALLBACK CUANDO SE CIERRA EL MODAL ---
+  onPaymentClosed(success: boolean) {
+    this.showPaymentModal = false; // Cerramos modal
+    
+    if (success) {
+      // Si el pago fue exitoso, limpiamos búsqueda y recargamos cola
+      this.busqueda = '';
+      this.searchResults = [];
+      this.cargarCola();
+    }
+    // Si canceló (success=false), no hacemos nada más, la música sigue sonando.
+  }
+
+  // ... cargarCola, refrescarColaSilenciosamente, reproducir, siguienteCancion, logout, ngOnDestroy IGUALES ...
   cargarCola() {
     this.gramolaService.obtenerCola(Number(this.usuario.id)).subscribe({
       next: (res: any) => {
         this.ngZone.run(() => {
           this.colaReproduccion = res;
-          // Si hay cola, tenemos dispositivo y NO está sonando nada, arrancar.
           if (this.deviceId && this.colaReproduccion.length > 0 && !this.currentTrack && !this.cambiandoCancion) {
             this.reproducir(this.colaReproduccion[0]);
           }
@@ -218,56 +225,32 @@ export class Gramola implements OnInit, OnDestroy {
 
   refrescarColaSilenciosamente() {
     this.gramolaService.obtenerCola(Number(this.usuario.id)).subscribe({
-      next: (res: any) => {
-        this.ngZone.run(() => {
-          this.colaReproduccion = res;
-        });
-      }
+      next: (res: any) => this.ngZone.run(() => this.colaReproduccion = res)
     });
   }
 
-  // --- FUNCIÓN DE REPRODUCCIÓN CORREGIDA ---
   reproducir(cancion: any) {
     if (!this.deviceId) return;
-
     this.spotifyService.playTrack(cancion.spotifyId, this.deviceId, this.usuario.id).subscribe({
       next: () => {
-        console.log("Reproduciendo:", cancion.titulo);
-        
-        // 1. Guardamos la canción que va a sonar (para poder finalizarla después)
         this.cancionSonando = cancion;
-
-        // 2. Avisamos al backend
         this.gramolaService.actualizarEstado(Number(cancion.id), 'SONANDO').subscribe();
-        
         this.cambiandoCancion = false;
         this.wasPlaying = false; 
       },
-      error: (err: any) => {
-        console.error("Error reproduciendo", err);
-        this.cambiandoCancion = false;
-      }
+      error: () => this.cambiandoCancion = false
     });
   }
 
-  // --- FUNCIÓN SIGUIENTE CANCIÓN CORREGIDA ---
   siguienteCancion() {
     if (this.colaReproduccion.length === 0) return;
-    
     if (this.cambiandoCancion) return;
     this.cambiandoCancion = true;
-
-    // Finalizamos LA QUE ESTABA SONANDO, no la primera de la cola
     if (this.cancionSonando) {
         this.gramolaService.actualizarEstado(Number(this.cancionSonando.id), 'TERMINADA').subscribe();
     }
-
-    // Tomamos la SIGUIENTE de la cola
     const siguiente = this.colaReproduccion[0];
-    
-    // Quitamos la siguiente de la lista visual localmente para evitar parpadeos
     this.colaReproduccion.shift(); 
-
     this.reproducir(siguiente);
   }
 

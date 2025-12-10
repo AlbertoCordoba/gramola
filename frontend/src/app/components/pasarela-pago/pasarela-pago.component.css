@@ -1,0 +1,51 @@
+.pasarela-container {
+  display: flex; justify-content: center; align-items: center; min-height: 100vh;
+  background: rgba(0,0,0,0.85); position: fixed; top: 0; left: 0; width: 100%; z-index: 999;
+  backdrop-filter: blur(5px);
+}
+
+.checkout-card {
+  background: #1e1e1e; width: 100%; max-width: 450px; border-radius: 16px;
+  padding: 30px; box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  border: 1px solid #333; color: white;
+}
+
+.header { border-bottom: 1px solid #333; padding-bottom: 15px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+h2 { margin: 0; font-size: 1.2rem; color: #fff; }
+.secure-icon { font-size: 0.8rem; color: #1ed760; background: rgba(30, 215, 96, 0.1); padding: 4px 8px; border-radius: 4px; }
+
+.summary { background: rgba(255,255,255,0.03); padding: 15px; border-radius: 8px; margin-bottom: 25px; }
+.item-info { display: flex; justify-content: space-between; margin-bottom: 10px; color: #b3b3b3; font-size: 0.9rem; }
+.total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 1.4rem; color: #1ed760; border-top: 1px dashed #444; padding-top: 10px; }
+
+.form-group { margin-bottom: 15px; position: relative; }
+.form-row { display: flex; gap: 15px; }
+.half { width: 50%; }
+label { display: block; font-size: 0.75rem; color: #888; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+
+.input-card {
+  width: 100%; background: #2a2a2a; border: 1px solid #444; color: white; padding: 12px;
+  border-radius: 6px; font-family: monospace; font-size: 1.1rem; box-sizing: border-box;
+  transition: border-color 0.2s;
+}
+.input-card:focus { border-color: #1ed760; outline: none; background: #333; }
+
+/* ERROR STYLES */
+.input-error { border-color: #ff5757 !important; background: rgba(255, 87, 87, 0.05); }
+.field-error { color: #ff6b6b; font-size: 0.8rem; margin-top: 4px; display: block; font-weight: bold; }
+
+.card-input-wrapper { position: relative; }
+.card-brand { position: absolute; right: 10px; top: 10px; font-size: 1.2rem; }
+
+.dev-controls { margin: 20px 0; padding: 10px; background: rgba(255, 87, 87, 0.1); border-radius: 6px; border: 1px dashed #ff5757; }
+.error-toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; color: #ff8e8e; font-size: 0.9rem; font-weight: 600; }
+
+.error-banner { background: #ff5757; color: white; padding: 12px; border-radius: 6px; margin-bottom: 15px; text-align: center; font-weight: bold; }
+
+.actions { display: flex; gap: 15px; margin-top: 25px; }
+button { flex: 1; padding: 14px; border-radius: 8px; font-weight: bold; cursor: pointer; border: none; font-size: 1rem; transition: 0.2s; }
+.btn-cancel { background: transparent; color: #888; border: 1px solid #444; }
+.btn-cancel:hover { color: white; border-color: white; }
+.btn-pay { background: #1ed760; color: black; }
+.btn-pay:hover { background: #1fdf64; transform: translateY(-2px); box-shadow: 0 5px 15px rgba(30, 215, 96, 0.3); }
+.btn-pay:disabled { opacity: 0.7; cursor: not-allowed; transform: none; box-shadow: none; }

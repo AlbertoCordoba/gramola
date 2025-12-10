@@ -29,12 +29,10 @@ public class BarController {
         }
     }
 
-    // REDIRECCIÓN TRAS VERIFICAR
     @GetMapping("/verificar")
     public RedirectView verificarEmail(@RequestParam String token) {
         try {
             barService.confirmarCuenta(token);
-            // Redirige al frontend a la página de pagos
             return new RedirectView("http://localhost:4200/pagos?verificado=true");
         } catch (Exception e) {
             return new RedirectView("http://localhost:4200/login?error=token_invalido");
@@ -81,14 +79,18 @@ public class BarController {
         return ResponseEntity.ok(barService.obtenerPrecios());
     }
 
+    // --- METODO MODIFICADO ---
     @PostMapping("/suscripcion")
     public ResponseEntity<?> activarSuscripcion(@RequestBody Map<String, Object> payload) {
         try {
-            // El frontend debe enviar el email del usuario para saber a quién activar
             String email = (String) payload.get("email");
             String tipo = (String) payload.get("tipo");
-            barService.activarSuscripcion(email, tipo);
-            return ResponseEntity.ok(Collections.singletonMap("mensaje", "Suscripción activada."));
+            
+            // Leemos si el frontend quiere simular error
+            boolean simularError = payload.containsKey("simularError") ? (boolean) payload.get("simularError") : false;
+            
+            barService.activarSuscripcion(email, tipo, simularError);
+            return ResponseEntity.ok(Collections.singletonMap("mensaje", "Suscripción activada y pagada."));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
         }
