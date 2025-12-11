@@ -12,58 +12,30 @@
     </div>
     
     <div class="user-info" *ngIf="usuario">
-      <div class="firma-badge" *ngIf="usuario.firmaImagen">
-        <span class="label-firma">Propietario:</span>
-        <img [src]="'data:image/png;base64,' + usuario.firmaImagen" alt="Firma" class="img-firma">
-      </div>
-
+      <span class="playlist-badge" *ngIf="playlistFondo">📻 Ambiente: {{ playlistFondo.name }}</span>
       <span class="user-badge">{{ usuario.nombre }}</span>
-      <button (click)="logout()" class="btn-icon" title="Cerrar sesión">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-      </button>
+      <button (click)="logout()" class="btn-icon">Salir</button>
     </div>
   </header>
 
   <main class="main-content">
-    <div *ngIf="!spotifyConnected" class="connect-screen fade-in">
-      <div class="glass-card connect-card">
-        <div class="icon-pulse">🔌</div>
-        <h2>Sincronización Requerida</h2>
-        <p>Conecta tu cuenta de Spotify Premium para activar el sistema de audio del bar.</p>
-        <button (click)="connectSpotify()" class="btn-primary glow">
-          <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_CMYK_Black.png" class="spotify-logo-btn">
-          Conectar Ahora
-        </button>
-      </div>
-    </div>
-
-    <div *ngIf="spotifyConnected" class="player-wrapper fade-in">
+    
+    <div class="player-wrapper fade-in">
       
       <section class="now-playing-glass" [class.is-paused]="isPaused">
         <div class="art-container">
-          <img *ngIf="currentTrack" [src]="currentTrack.album.images[0].url" class="album-art" alt="Album Art">
-          <div *ngIf="!currentTrack" class="album-placeholder">
-            <span>💿</span>
-          </div>
+          <img *ngIf="currentTrack" [src]="currentTrack.album.images[0].url" class="album-art">
+          <div *ngIf="!currentTrack" class="album-placeholder">💿</div>
           <div class="vinyl-record" *ngIf="currentTrack" [class.spinning]="!isPaused"></div>
         </div>
 
         <div class="track-info-large">
           <div class="status-pill" *ngIf="currentTrack">
             <span class="dot" [class.animate]="!isPaused"></span>
-            {{ isPaused ? 'Pausado' : 'Sonando en el local' }}
+            {{ cancionSonando ? 'Pedido por Cliente' : 'Música de Ambiente' }}
           </div>
-          
-          <h2 class="hero-title">
-            {{ currentTrack ? currentTrack.name : 'Silencio en la sala' }}
-          </h2>
-          <p class="hero-artist">
-            {{ currentTrack ? currentTrack.artists[0].name : 'Añade canciones a la cola para empezar' }}
-          </p>
-          
-          <div class="progress-bar-container" *ngIf="currentTrack">
-            <div class="progress-bar" [class.animating]="!isPaused"></div>
-          </div>
+          <h2 class="hero-title">{{ currentTrack ? currentTrack.name : 'Iniciando...' }}</h2>
+          <p class="hero-artist">{{ currentTrack ? currentTrack.artists[0].name : '' }}</p>
         </div>
       </section>
 
@@ -71,23 +43,19 @@
         <div class="search-glass">
           <span class="search-icon">🔍</span>
           <input type="text" [(ngModel)]="busqueda" (keyup.enter)="search()" 
-                 [disabled]="isSearching"
-                 placeholder="Busca tu canción favorita..." class="search-input">
-          
-          <button (click)="search()" class="btn-search" [disabled]="isSearching">
-            {{ isSearching ? '...' : 'Buscar' }}
-          </button>
+                 placeholder="Añadir canción a la cola..." class="search-input">
+          <button (click)="search()" class="btn-search">Buscar</button>
         </div>
       </section>
 
       <div *ngIf="searchResults.length > 0" class="results-overlay fade-in-up">
         <div class="glass-header-results">
-          <h3>Resultados de la búsqueda</h3>
+          <h3>Resultados</h3>
           <button class="btn-close" (click)="searchResults = []">✕</button>
         </div>
         <div class="results-grid">
           <div class="result-card" *ngFor="let track of searchResults" (click)="anadir(track)">
-            <img [src]="track.album.images[1]?.url || track.album.images[0]?.url" class="result-img">
+            <img [src]="track.album.images[0]?.url" class="result-img">
             <div class="result-info">
               <span class="r-title">{{ track.name }}</span>
               <span class="r-artist">{{ track.artists[0].name }}</span>
@@ -101,23 +69,19 @@
       </div>
 
       <section class="queue-section">
-        <h3 class="section-title">Siguientes en la Cola</h3>
-        
+        <h3 class="section-title">Cola de Pedidos</h3>
         <div *ngIf="colaReproduccion.length === 0" class="empty-state-glass">
-          <div class="empty-icon">😴</div>
-          <p>La cola está vacía. ¡Sé el DJ y añade algo!</p>
+          <div class="empty-icon">😌</div>
+          <p>No hay pedidos. Sonando {{ playlistFondo?.name || 'música de ambiente' }}.</p>
         </div>
-
         <div class="queue-list" *ngIf="colaReproduccion.length > 0">
-          <div class="queue-card fade-in-stagger" *ngFor="let item of colaReproduccion; let i = index">
+          <div class="queue-card" *ngFor="let item of colaReproduccion; let i = index">
             <div class="q-index">{{ i + 1 }}</div>
             <div class="q-info">
               <span class="q-title">{{ item.titulo }}</span>
               <span class="q-artist">{{ item.artista }}</span>
             </div>
-            <div class="q-status">
-              <span class="badge-wait">En espera</span>
-            </div>
+            <span class="badge-wait">En espera</span>
           </div>
         </div>
       </section>
@@ -125,10 +89,6 @@
     </div>
   </main>
 
-  <app-pasarela-pago 
-    *ngIf="showPaymentModal" 
-    [isModal]="true" 
-    (close)="onPaymentClosed($event)">
-  </app-pasarela-pago>
+  <app-pasarela-pago *ngIf="showPaymentModal" [isModal]="true" (close)="onPaymentClosed($event)"></app-pasarela-pago>
 
 </div>

@@ -25,14 +25,11 @@ export class LoginComponent {
   onLogin() {
     this.barService.login(this.loginData).subscribe({
       next: (res: any) => {
-        console.log('Login correcto:', res);
         localStorage.setItem('usuarioBar', JSON.stringify(res));
-        
-        // REDIRECCIÓN A LA GRAMOLA
-        this.router.navigate(['/gramola']);
+        // REDIRIGIR A CONFIGURACIÓN PRIMERO
+        this.router.navigate(['/config-audio']);
       },
       error: (err: any) => {
-        console.error('Error:', err);
         this.errorMessage = 'Email o contraseña incorrectos';
       }
     });

@@ -1,0 +1,60 @@
+<div class="container-setup">
+  
+  <header class="glass-header">
+    <div class="brand">
+      <div class="logo-circle">🎵</div>
+      <h1>Gramola<span class="highlight">Virtual</span></h1>
+    </div>
+    
+    <div class="user-info" *ngIf="usuario">
+      <div class="firma-badge" *ngIf="usuario.firmaImagen">
+        <span class="label-firma">Propietario:</span>
+        <img [src]="'data:image/png;base64,' + usuario.firmaImagen" alt="Firma" class="img-firma">
+      </div>
+      <span class="user-badge">{{ usuario.nombre }}</span>
+      <button (click)="logout()" class="btn-icon" title="Cerrar sesión">Salir</button>
+    </div>
+  </header>
+
+  <div class="content-wrapper">
+
+    <div *ngIf="!spotifyConnected" class="connect-screen fade-in">
+      <div class="glass-card connect-card">
+        <div class="icon-pulse">🔌</div>
+        <h2>Sincronización Requerida</h2>
+        <p>Conecta tu cuenta de Spotify Premium para activar el sistema de audio del bar.</p>
+        <button (click)="conectarSpotify()" class="btn-primary glow">
+          <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_CMYK_Black.png" class="spotify-logo-btn">
+          Conectar Ahora
+        </button>
+      </div>
+    </div>
+
+    <div *ngIf="spotifyConnected" class="glass-card setup-card fade-in">
+      <div class="header-setup">
+        <div class="icon-static">📻</div>
+        <h2>Música de Ambiente</h2>
+      </div>
+      <p>Elige la playlist que sonará cuando no haya pedidos de clientes.</p>
+      
+      <div class="search-box">
+        <input type="text" [(ngModel)]="busqueda" (keyup.enter)="buscar()" placeholder="Ej: Rock FM, Top 50 España...">
+        <button (click)="buscar()" class="btn-search">Buscar</button>
+      </div>
+
+      <div class="results-list" *ngIf="resultados.length > 0">
+        <div class="playlist-item" *ngFor="let pl of resultados" (click)="seleccionar(pl)">
+          <img [src]="pl.images[0]?.url || 'assets/disc.png'" class="pl-img">
+          <div class="pl-info">
+            <span class="pl-name">{{ pl.name }}</span>
+            <span class="pl-tracks">{{ pl.tracks.total }} canciones</span>
+          </div>
+          <button class="btn-select">Elegir</button>
+        </div>
+      </div>
+      
+      <p *ngIf="resultados.length === 0 && busqueda" class="no-results">No se encontraron playlists.</p>
+    </div>
+
+  </div>
+</div>

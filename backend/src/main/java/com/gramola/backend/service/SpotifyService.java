@@ -31,20 +31,20 @@ public class SpotifyService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    // 1. Generar URL de Login (Añadimos 'streaming' que es OBLIGATORIO para el SDK)
-    // Pasamos el barId en el "state" para saber quién se está logueando a la vuelta
+    // 1. LOGIN (URL OFICIAL)
     public String getAuthorizationUrl(Long barId) {
-        String scope = "streaming user-read-private user-read-email user-modify-playback-state user-read-playback-state";
+        // Importante: 'playlist-read-private' es necesario para buscar tus playlists
+        String scope = "streaming user-read-private user-read-email user-modify-playback-state user-read-playback-state playlist-read-private";
         
         return "https://accounts.spotify.com/authorize" + 
                 "?client_id=" + clientId +
                 "&response_type=code" +
                 "&redirect_uri=" + redirectUri +
                 "&scope=" + scope +
-                "&state=" + barId; // Guardamos el ID del bar en el flujo OAuth
+                "&state=" + barId;
     }
 
-    // 2. Canjear el código por tokens y GUARDARLOS EN BD
+    // 2. CANJEAR TOKEN (URL OFICIAL)
     public void exchangeCodeForToken(String code, Long barId) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -68,7 +68,6 @@ public class SpotifyService {
 
                 Bar bar = barRepository.findById(barId).orElseThrow();
                 bar.setSpotifyAccessToken(accessToken);
-                // El refresh token es crucial para mantener la sesión viva meses
                 if (refreshToken != null) {
                     bar.setSpotifyRefreshToken(refreshToken);
                 }
@@ -81,7 +80,7 @@ public class SpotifyService {
         }
     }
 
-    // 3. Obtener un token válido (Refrescándolo si ha caducado)
+    // 3. GESTIÓN DEL TOKEN
     public String getAccessTokenForBar(Long barId) {
         Bar bar = barRepository.findById(barId).orElseThrow(() -> new RuntimeException("Bar no encontrado"));
         
@@ -89,7 +88,6 @@ public class SpotifyService {
             throw new RuntimeException("Bar no conectado a Spotify");
         }
 
-        // Si el token ha caducado (o le quedan menos de 5 min), lo renovamos
         if (bar.getSpotifyTokenExpiresAt() == null || LocalDateTime.now().plusMinutes(5).isAfter(bar.getSpotifyTokenExpiresAt())) {
             refreshAccessToken(bar);
         }
@@ -116,7 +114,6 @@ public class SpotifyService {
                 String newAccessToken = (String) resp.get("access_token");
                 Integer expiresIn = (Integer) resp.get("expires_in");
                 
-                // A veces Spotify rota el refresh token también
                 if (resp.containsKey("refresh_token")) {
                     bar.setSpotifyRefreshToken((String) resp.get("refresh_token"));
                 }
@@ -130,17 +127,16 @@ public class SpotifyService {
         }
     }
 
-    // 4. Buscar canciones (Usando el token del bar)
-    public Object searchTracks(String query, Long barId) {
-        String token = getAccessTokenForBar(barId); // Esto garantiza que el token es válido
-
+    // 4. BUSCAR (AHORA SOPORTA TRACK O PLAYLIST)
+    public Object search(String query, String type, Long barId) {
+        String token = getAccessTokenForBar(barId); 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
         HttpEntity<String> entity = new HttpEntity<>(headers);
 
         String url = UriComponentsBuilder.fromUriString("https://api.spotify.com/v1/search") 
                 .queryParam("q", query)      
-                .queryParam("type", "track") 
+                .queryParam("type", type) // 'track' o 'playlist'
                 .queryParam("limit", 10)
                 .toUriString();             
 
@@ -148,20 +144,33 @@ public class SpotifyService {
         return response.getBody(); 
     }
     
-    // 5. Reproducir canción en el dispositivo Web SDK
+    // 5. REPRODUCIR CANCIÓN (TRACK)
     public void playTrack(String trackUri, String deviceId, Long barId) {
         String token = getAccessTokenForBar(barId);
-        
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
         headers.setContentType(MediaType.APPLICATION_JSON);
         
-        // Body: { "uris": ["spotify:track:xyz"] }
         Map<String, Object> body = Map.of("uris", new String[]{trackUri});
-        
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
         
-        // Llamada a la API de Spotify Player
-        restTemplate.put("https://api.spotify.com/v1/me/player/play?device_id=" + deviceId, request);
+        // URL para controlar el reproductor
+        String url = "https://api.spotify.com/v1/me/player/play?device_id=" + deviceId;
+        restTemplate.put(url, request);
+    }
+
+    // 6. REPRODUCIR PLAYLIST (CONTEXT) - ¡NUEVO!
+    public void playContext(String contextUri, String deviceId, Long barId) {
+        String token = getAccessTokenForBar(barId);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        
+        // Para playlists usamos "context_uri" en lugar de "uris"
+        Map<String, Object> body = Map.of("context_uri", contextUri);
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        
+        String url = "https://api.spotify.com/v1/me/player/play?device_id=" + deviceId;
+        restTemplate.put(url, request);
     }
 }
