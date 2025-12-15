@@ -1,21 +1,5 @@
 <div class="container-setup">
   
-  <header class="glass-header">
-    <div class="brand">
-      <div class="logo-circle">🎵</div>
-      <h1>Gramola<span class="highlight">Virtual</span></h1>
-    </div>
-    
-    <div class="user-info" *ngIf="usuario">
-      <div class="firma-badge" *ngIf="usuario.firmaImagen">
-        <span class="label-firma">Propietario:</span>
-        <img [src]="'data:image/png;base64,' + usuario.firmaImagen" alt="Firma" class="img-firma">
-      </div>
-      <span class="user-badge">{{ usuario.nombre }}</span>
-      <button (click)="logout()" class="btn-icon" title="Cerrar sesión">Salir</button>
-    </div>
-  </header>
-
   <div class="content-wrapper">
 
     <div *ngIf="!spotifyConnected" class="connect-screen fade-in">

@@ -1,7 +1,7 @@
 <div class="login-container">
   <div class="login-card">
-    <h2>Gramola Virtual</h2>
-    <p class="subtitle">Acceso para Bares</p>
+    <h2>Bienvenido</h2>
+    <p class="subtitle">Accede a tu panel de control</p>
 
     <form (ngSubmit)="onLogin()">
       <div class="form-group">
@@ -14,8 +14,8 @@
         <input type="password" id="password" [(ngModel)]="loginData.password" name="password" placeholder="******" required>
       </div>
 
-      <div style="text-align: right; margin-bottom: 15px;">
-        <a routerLink="/recuperar-password" style="font-size: 0.9rem; color: #1ed760; text-decoration: none;">
+      <div style="text-align: right; margin-bottom: 20px;">
+        <a routerLink="/recuperar-password" class="nav-link" style="font-size: 0.85rem; border: none;">
           ¿Olvidaste tu contraseña?
         </a>
       </div>
@@ -26,7 +26,7 @@
     </form>
 
     <div class="footer-links">
-      <p>¿No tienes cuenta? <a routerLink="/registro">Regístrate aquí</a></p>
+      <p class="text-sec">¿No tienes cuenta? <a routerLink="/registro" class="nav-link">Regístrate gratis</a></p>
     </div>
   </div>
 </div>

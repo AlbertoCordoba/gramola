@@ -49,7 +49,7 @@ export class Gramola implements OnInit, OnDestroy {
   isPaused: boolean = false;
   modoReproduccion: ModoReproduccion = 'AMBIENTE';
   cancionSonando: any = null; 
-  resumeTrackUri: string = ''; // AQUÍ GUARDAMOS DÓNDE VOLVER
+  resumeTrackUri: string = ''; 
   
   showPaymentModal: boolean = false;
 
@@ -83,10 +83,11 @@ export class Gramola implements OnInit, OnDestroy {
 
     if (this.usuario) {
       this.initSpotifySDK();
-      this.cargarCola(false); 
+      this.cargarCola(); // Carga inicial
       
+      // FIX: El intervalo ahora siempre refresca la vista
       this.pollingInterval = setInterval(() => {
-        if (!this.changingTrack) this.cargarCola(false);
+        if (!this.changingTrack) this.cargarCola();
       }, 5000);
     }
   }
@@ -131,9 +132,11 @@ export class Gramola implements OnInit, OnDestroy {
       });
     });
 
+    // FIX: Aseguramos que los cambios de estado (canción/pausa) refresquen la UI
     this.player.addListener('player_state_changed', (state: any) => {
       this.ngZone.run(() => {
         this.gestionarCambioDeEstado(state);
+        this.cdr.detectChanges(); // Forzamos actualización visual (carátula, títulos)
       });
     });
 
@@ -150,19 +153,18 @@ export class Gramola implements OnInit, OnDestroy {
     const isPaused = state.paused;
     const position = state.position;
 
+    // Actualizamos datos básicos
     this.currentTrack = state.track_window.current_track;
     this.isPaused = isPaused;
-    this.cdr.detectChanges();
 
     if (this.changingTrack) return;
 
     // CASO 1: AMBIENTE -> Detectamos cambio de canción
     if (this.modoReproduccion === 'AMBIENTE') {
       if (this.lastTrackId && currentTrackId !== this.lastTrackId) {
-        // Si hay cola, INTERRUMPIMOS la que acaba de empezar
         if (this.colaReproduccion.length > 0) {
-          console.log("Hay pedidos. Guardando punto de retorno:", currentTrackUri);
-          this.resumeTrackUri = currentTrackUri; // Guardamos URI para volver luego
+          console.log("Hay pedidos. Interrumpiendo ambiente...");
+          this.resumeTrackUri = currentTrackUri;
           this.procesarSiguientePedido();
         } 
       }
@@ -177,7 +179,7 @@ export class Gramola implements OnInit, OnDestroy {
         if (this.colaReproduccion.length > 0) {
           this.procesarSiguientePedido();
         } else {
-          console.log("Cola vacía. Volviendo a ambiente en:", this.resumeTrackUri || "Inicio");
+          console.log("Volviendo a ambiente...");
           this.reproducirAmbiente();
         }
       }
@@ -197,7 +199,10 @@ export class Gramola implements OnInit, OnDestroy {
 
     this.spotifyService.playContext(this.playlistFondo.uri, this.deviceId, this.usuario.id, offset).subscribe({
       next: () => {
-        setTimeout(() => this.changingTrack = false, 1000);
+        setTimeout(() => {
+            this.changingTrack = false;
+            this.cdr.detectChanges();
+        }, 1000);
       },
       error: () => this.changingTrack = false
     });
@@ -216,7 +221,10 @@ export class Gramola implements OnInit, OnDestroy {
       next: () => {
         this.gramolaService.actualizarEstado(Number(siguienteCancion.id), 'SONANDO').subscribe();
         this.colaReproduccion.shift(); 
-        setTimeout(() => this.changingTrack = false, 1500);
+        setTimeout(() => {
+            this.changingTrack = false;
+            this.cdr.detectChanges(); // Actualizar UI tras cambio
+        }, 1500);
       },
       error: (e) => {
         console.error("Error reproduciendo pedido", e);
@@ -233,7 +241,8 @@ export class Gramola implements OnInit, OnDestroy {
     }
   }
 
-  cargarCola(actualizarVisualmente: boolean = true) {
+  // FIX: Eliminado el parámetro opcional. Ahora SIEMPRE actualiza visualmente.
+  cargarCola() {
     this.gramolaService.obtenerCola(Number(this.usuario.id)).subscribe({
       next: (res: any) => {
         this.ngZone.run(() => {
@@ -242,36 +251,25 @@ export class Gramola implements OnInit, OnDestroy {
           } else {
             this.colaReproduccion = res;
           }
-          if (actualizarVisualmente) {
-            this.cdr.detectChanges();
-          }
+          // Forzamos siempre el repintado de la cola
+          this.cdr.detectChanges();
         });
       }
     });
   }
 
-  // --- BUSCADOR CORREGIDO CON DETECCIÓN DE CAMBIOS MANUAL ---
   search() {
     if (!this.busqueda || this.busqueda.trim().length <= 2) return;
     this.isSearching = true; 
     this.searchResults = []; 
     
-    console.time('TiempoFrontend');
-
     this.spotifyService.search(this.busqueda, this.usuario.id, 'track').subscribe({
       next: (res: any) => {
         this.ngZone.run(() => {
-          console.timeEnd('TiempoFrontend');
-          console.log("Datos recibidos:", res);
-
           if (res && res.tracks && res.tracks.items) {
             this.searchResults = res.tracks.items;
-          } else {
-            console.warn("Respuesta vacía o inesperada", res);
           }
-          
           this.isSearching = false;
-          // FUERZA A ANGULAR A PINTAR LA LISTA INMEDIATAMENTE
           this.cdr.detectChanges(); 
         });
       },
@@ -306,7 +304,8 @@ export class Gramola implements OnInit, OnDestroy {
     if (success) {
       this.busqueda = '';
       this.searchResults = [];
-      this.cargarCola(true); 
+      // Al cerrar el pago con éxito, cargamos la cola inmediatamente
+      this.cargarCola(); 
     }
   }
 

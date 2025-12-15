@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { Component, inject, OnInit, NgZone, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -12,18 +12,24 @@ import { SpotifyConnectService } from '../../services/spotify.service';
   styleUrls: ['./seleccion-playlist.component.css']
 })
 export class SeleccionPlaylistComponent implements OnInit {
+  // Inyecciones de servicios
   private spotifyService = inject(SpotifyConnectService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
+  
+  // Servicios para forzar la actualización de la vista
+  private ngZone = inject(NgZone);
+  private cdr = inject(ChangeDetectorRef);
 
   usuario: any = null;
   spotifyConnected: boolean = false;
   
   busqueda: string = '';
   resultados: any[] = [];
+  cargando: boolean = false; // Nuevo: para mostrar feedback visual si quieres
 
   ngOnInit() {
-    // 1. Cargar usuario
+    // 1. Cargar usuario del almacenamiento local
     const userJson = localStorage.getItem('usuarioBar');
     if (userJson) {
       this.usuario = JSON.parse(userJson);
@@ -32,21 +38,14 @@ export class SeleccionPlaylistComponent implements OnInit {
       return;
     }
 
-    // 2. LÓGICA ROBUSTA (Sin parpadeos)
-    // Miramos la URL una sola vez al entrar
+    // 2. Verificar si volvemos de la autenticación de Spotify
     const params = this.route.snapshot.queryParams;
-
     if (params['status'] === 'success') {
       console.log("¡Conexión exitosa detectada!");
       this.spotifyConnected = true;
-      
-      // Limpiamos la URL silenciosamente
-      this.router.navigate([], { 
-        replaceUrl: true, 
-        queryParams: {} 
-      });
+      // Limpiamos la URL para que quede limpia
+      this.router.navigate([], { replaceUrl: true, queryParams: {} });
     } else {
-      // Si NO venimos de conectar, entonces sí preguntamos al backend
       this.checkConexion();
     }
   }
@@ -71,13 +70,33 @@ export class SeleccionPlaylistComponent implements OnInit {
     });
   }
 
+  // --- SOLUCIÓN AL PROBLEMA DEL BUSCADOR ---
   buscar() {
-    if (!this.busqueda) return;
+    if (!this.busqueda || this.busqueda.trim().length === 0) return;
+    
+    this.cargando = true;
+    this.resultados = []; // Limpiamos la lista visualmente para que se note la nueva búsqueda
+
     this.spotifyService.search(this.busqueda, this.usuario.id, 'playlist').subscribe({
       next: (res: any) => {
-        this.resultados = res.playlists?.items || [];
+        // NgZone.run asegura que Angular sepa que esto ha ocurrido dentro de su "zona"
+        this.ngZone.run(() => {
+          console.log("Resultados recibidos del backend:", res); // Debug
+          
+          this.resultados = res.playlists?.items || [];
+          this.cargando = false;
+          
+          // detectChanges() fuerza a Angular a repintar el HTML inmediatamente
+          this.cdr.detectChanges();
+        });
       },
-      error: (err) => console.error('Error buscando playlists', err)
+      error: (err) => {
+        console.error('Error buscando playlists', err);
+        this.ngZone.run(() => {
+          this.cargando = false;
+          this.cdr.detectChanges();
+        });
+      }
     });
   }
 

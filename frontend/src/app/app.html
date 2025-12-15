@@ -1,1 +1,35 @@
-<router-outlet></router-outlet>
+<div class="app-layout">
+  
+  <header class="glass-header">
+    
+    <div class="header-left" [class.centered]="isPublicPage">
+      <div class="brand" routerLink="/">
+        <div class="logo-circle">🎵</div>
+        <h1>Gramola<span class="highlight">Virtual</span></h1>
+      </div>
+    </div>
+
+    <div class="header-right" *ngIf="!isPublicPage && usuario">
+      <div class="profile-card glass-effect">
+        <div class="profile-info">
+          <span class="role-badge">ADMINISTRADOR</span>
+          <span class="user-name">{{ usuario.nombre }}</span>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="firma-box" *ngIf="usuario.firmaImagen">
+          <img [src]="'data:image/png;base64,' + usuario.firmaImagen" alt="Firma" class="img-firma">
+        </div>
+
+        <button (click)="logout()" class="btn-logout" title="Cerrar sesión">✕</button>
+      </div>
+    </div>
+
+  </header>
+
+  <div class="content-area">
+    <router-outlet></router-outlet>
+  </div>
+
+</div>

@@ -5,18 +5,23 @@
 
 <div class="gramola-container">
   
-  <header class="glass-header">
-    <div class="brand">
-      <div class="logo-circle">🎵</div>
-      <h1>Gramola<span class="highlight">Virtual</span></h1>
+  <div class="ambient-floating-bar fade-in" *ngIf="playlistFondo">
+    <div class="ambient-capsule glass-effect">
+      
+      <div class="equalizer">
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+        <span class="bar"></span>
+      </div>
+
+      <div class="ambient-text">
+        <span class="label-status">EN EL AIRE • CANAL DE FONDO</span>
+        <span class="pl-title">{{ playlistFondo.name }}</span>
+      </div>
+      
     </div>
-    
-    <div class="user-info" *ngIf="usuario">
-      <span class="playlist-badge" *ngIf="playlistFondo">📻 Ambiente: {{ playlistFondo.name }}</span>
-      <span class="user-badge">{{ usuario.nombre }}</span>
-      <button (click)="logout()" class="btn-icon">Salir</button>
-    </div>
-  </header>
+  </div>
 
   <main class="main-content">
     
@@ -72,7 +77,7 @@
         <h3 class="section-title">Cola de Pedidos</h3>
         <div *ngIf="colaReproduccion.length === 0" class="empty-state-glass">
           <div class="empty-icon">😌</div>
-          <p>No hay pedidos. Sonando {{ playlistFondo?.name || 'música de ambiente' }}.</p>
+          <p>No hay pedidos en espera.</p>
         </div>
         <div class="queue-list" *ngIf="colaReproduccion.length > 0">
           <div class="queue-card" *ngFor="let item of colaReproduccion; let i = index">
