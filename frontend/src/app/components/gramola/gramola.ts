@@ -15,6 +15,8 @@ declare global {
   }
 }
 
+type ModoReproduccion = 'AMBIENTE' | 'PEDIDO';
+
 @Component({
   selector: 'app-gramola',
   standalone: true,
@@ -41,15 +43,19 @@ export class Gramola implements OnInit, OnDestroy {
   colaReproduccion: any[] = [];
   player: any;
   deviceId: string = '';
+  
+  // Estado de reproducción
   currentTrack: any = null;
-  cancionSonando: any = null; 
   isPaused: boolean = false;
+  modoReproduccion: ModoReproduccion = 'AMBIENTE';
+  cancionSonando: any = null; 
+  resumeTrackUri: string = ''; // AQUÍ GUARDAMOS DÓNDE VOLVER
+  
   showPaymentModal: boolean = false;
 
   private pollingInterval: any;
-  private cambiandoCancion: boolean = false;
-  private wasPlaying: boolean = false;
-  private lastTrackId: string = ''; // Para detectar cambio de canción
+  private lastTrackId: string = ''; 
+  private changingTrack: boolean = false; 
 
   constructor() {
     const userJson = localStorage.getItem('usuarioBar');
@@ -77,10 +83,11 @@ export class Gramola implements OnInit, OnDestroy {
 
     if (this.usuario) {
       this.initSpotifySDK();
-      this.cargarCola();
+      this.cargarCola(false); 
+      
       this.pollingInterval = setInterval(() => {
-        if (!this.cambiandoCancion) this.refrescarColaSilenciosamente();
-      }, 3000);
+        if (!this.changingTrack) this.cargarCola(false);
+      }, 5000);
     }
   }
 
@@ -118,71 +125,161 @@ export class Gramola implements OnInit, OnDestroy {
 
     this.player.addListener('ready', ({ device_id }: any) => {
       this.ngZone.run(() => {
-        console.log('Player Listo:', device_id);
+        console.log('Player Listo. Device ID:', device_id);
         this.deviceId = device_id;
-        
-        // Al arrancar, si hay cola ponemos cola. Si no, ambiente.
-        if (this.colaReproduccion.length > 0) {
-            this.reproducir(this.colaReproduccion[0]);
-        } else {
-            this.reproducirFondo();
-        }
+        this.reproducirAmbiente();
       });
     });
 
     this.player.addListener('player_state_changed', (state: any) => {
       this.ngZone.run(() => {
-        if (!state) return;
-        
-        const nuevoTrackId = state.track_window.current_track.id;
-        
-        // 1. DETECTAR CAMBIO DE CANCIÓN (Cuando termina la de ambiente y empieza la siguiente)
-        if (this.lastTrackId && this.lastTrackId !== nuevoTrackId) {
-            // Si estamos en modo ambiente (sin canción pagada sonando) y hay cola pendiente...
-            if (!this.cancionSonando && this.colaReproduccion.length > 0 && !this.cambiandoCancion) {
-                console.log("Canción de ambiente terminada. ¡Entra pedido!");
-                this.siguienteCancion(); // Esto pondrá la primera de la cola
-            }
-        }
-        this.lastTrackId = nuevoTrackId;
-
-        this.currentTrack = state.track_window.current_track;
-        this.isPaused = state.paused;
-        if (!state.paused) this.wasPlaying = true;
-
-        // 2. DETECTAR FIN DE CANCIÓN (Solo para las que se pausan al final, usualmente las pagadas sueltas)
-        if (state.paused && state.position === 0 && this.wasPlaying && !this.cambiandoCancion) {
-            this.wasPlaying = false; 
-            if (this.cancionSonando) {
-                console.log("Canción pagada terminada.");
-                this.siguienteCancion();
-            }
-        }
-        this.cdr.detectChanges();
+        this.gestionarCambioDeEstado(state);
       });
     });
+
     this.player.connect();
   }
 
-  reproducirFondo() {
-    if (!this.playlistFondo || !this.deviceId) return;
-    console.log("Iniciando ambiente:", this.playlistFondo.name);
-    this.spotifyService.playContext(this.playlistFondo.uri, this.deviceId, this.usuario.id).subscribe();
+  // --- LÓGICA CORE DE REPRODUCCIÓN ---
+
+  gestionarCambioDeEstado(state: any) {
+    if (!state) return;
+
+    const currentTrackId = state.track_window.current_track?.id;
+    const currentTrackUri = state.track_window.current_track?.uri;
+    const isPaused = state.paused;
+    const position = state.position;
+
+    this.currentTrack = state.track_window.current_track;
+    this.isPaused = isPaused;
+    this.cdr.detectChanges();
+
+    if (this.changingTrack) return;
+
+    // CASO 1: AMBIENTE -> Detectamos cambio de canción
+    if (this.modoReproduccion === 'AMBIENTE') {
+      if (this.lastTrackId && currentTrackId !== this.lastTrackId) {
+        // Si hay cola, INTERRUMPIMOS la que acaba de empezar
+        if (this.colaReproduccion.length > 0) {
+          console.log("Hay pedidos. Guardando punto de retorno:", currentTrackUri);
+          this.resumeTrackUri = currentTrackUri; // Guardamos URI para volver luego
+          this.procesarSiguientePedido();
+        } 
+      }
+    }
+
+    // CASO 2: PEDIDO -> Canción termina
+    if (this.modoReproduccion === 'PEDIDO') {
+      if (isPaused && position === 0 && this.lastTrackId === currentTrackId) {
+        console.log("Canción de pedido terminada.");
+        this.finalizarPedidoActual();
+        
+        if (this.colaReproduccion.length > 0) {
+          this.procesarSiguientePedido();
+        } else {
+          console.log("Cola vacía. Volviendo a ambiente en:", this.resumeTrackUri || "Inicio");
+          this.reproducirAmbiente();
+        }
+      }
+    }
+
+    this.lastTrackId = currentTrackId;
   }
 
+  reproducirAmbiente() {
+    if (!this.deviceId || !this.playlistFondo) return;
+    
+    this.changingTrack = true;
+    this.modoReproduccion = 'AMBIENTE';
+    this.cancionSonando = null;
+
+    const offset = this.resumeTrackUri ? this.resumeTrackUri : undefined;
+
+    this.spotifyService.playContext(this.playlistFondo.uri, this.deviceId, this.usuario.id, offset).subscribe({
+      next: () => {
+        setTimeout(() => this.changingTrack = false, 1000);
+      },
+      error: () => this.changingTrack = false
+    });
+  }
+
+  procesarSiguientePedido() {
+    if (this.colaReproduccion.length === 0) return;
+
+    this.changingTrack = true;
+    const siguienteCancion = this.colaReproduccion[0];
+    
+    this.modoReproduccion = 'PEDIDO';
+    this.cancionSonando = siguienteCancion;
+    
+    this.spotifyService.playTrack(siguienteCancion.spotifyId, this.deviceId, this.usuario.id).subscribe({
+      next: () => {
+        this.gramolaService.actualizarEstado(Number(siguienteCancion.id), 'SONANDO').subscribe();
+        this.colaReproduccion.shift(); 
+        setTimeout(() => this.changingTrack = false, 1500);
+      },
+      error: (e) => {
+        console.error("Error reproduciendo pedido", e);
+        this.changingTrack = false;
+        this.reproducirAmbiente();
+      }
+    });
+  }
+
+  finalizarPedidoActual() {
+    if (this.cancionSonando) {
+      this.gramolaService.actualizarEstado(Number(this.cancionSonando.id), 'TERMINADA').subscribe();
+      this.cancionSonando = null;
+    }
+  }
+
+  cargarCola(actualizarVisualmente: boolean = true) {
+    this.gramolaService.obtenerCola(Number(this.usuario.id)).subscribe({
+      next: (res: any) => {
+        this.ngZone.run(() => {
+          if (this.cancionSonando) {
+            this.colaReproduccion = res.filter((c: any) => c.id !== this.cancionSonando.id);
+          } else {
+            this.colaReproduccion = res;
+          }
+          if (actualizarVisualmente) {
+            this.cdr.detectChanges();
+          }
+        });
+      }
+    });
+  }
+
+  // --- BUSCADOR CORREGIDO CON DETECCIÓN DE CAMBIOS MANUAL ---
   search() {
     if (!this.busqueda || this.busqueda.trim().length <= 2) return;
     this.isSearching = true; 
     this.searchResults = []; 
+    
+    console.time('TiempoFrontend');
+
     this.spotifyService.search(this.busqueda, this.usuario.id, 'track').subscribe({
       next: (res: any) => {
         this.ngZone.run(() => {
-          this.searchResults = res.tracks.items;
+          console.timeEnd('TiempoFrontend');
+          console.log("Datos recibidos:", res);
+
+          if (res && res.tracks && res.tracks.items) {
+            this.searchResults = res.tracks.items;
+          } else {
+            console.warn("Respuesta vacía o inesperada", res);
+          }
+          
           this.isSearching = false;
-          this.cdr.detectChanges();
+          // FUERZA A ANGULAR A PINTAR LA LISTA INMEDIATAMENTE
+          this.cdr.detectChanges(); 
         });
       },
-      error: () => this.isSearching = false
+      error: (err) => {
+        console.error("Error búsqueda:", err);
+        this.isSearching = false;
+        this.cdr.detectChanges();
+      }
     });
   }
 
@@ -209,69 +306,8 @@ export class Gramola implements OnInit, OnDestroy {
     if (success) {
       this.busqueda = '';
       this.searchResults = [];
-      this.cargarCola(); // Solo actualizamos la lista, NO reproducimos
+      this.cargarCola(true); 
     }
-  }
-
-  // --- LÓGICA DE COLA CORREGIDA ---
-  cargarCola() {
-    this.gramolaService.obtenerCola(Number(this.usuario.id)).subscribe({
-      next: (res: any) => {
-        this.ngZone.run(() => {
-            this.colaReproduccion = res;
-            // CORRECCIÓN: YA NO REPRODUCIMOS AQUÍ AUTOMÁTICAMENTE.
-            // Dejamos que suene lo que estaba sonando (ambiente).
-            // El listener 'player_state_changed' se encargará de cambiar cuando acabe la actual.
-        });
-      }
-    });
-  }
-
-  refrescarColaSilenciosamente() {
-    this.gramolaService.obtenerCola(Number(this.usuario.id)).subscribe({
-      next: (res: any) => {
-        this.ngZone.run(() => {
-          this.colaReproduccion = res;
-          // Igual aquí: solo actualizamos datos visuales.
-        });
-      }
-    });
-  }
-
-  reproducir(cancion: any) {
-    if (!this.deviceId) return;
-    this.spotifyService.playTrack(cancion.spotifyId, this.deviceId, this.usuario.id).subscribe({
-      next: () => {
-        console.log("Reproduciendo pagada:", cancion.titulo);
-        this.cancionSonando = cancion;
-        this.gramolaService.actualizarEstado(Number(cancion.id), 'SONANDO').subscribe();
-        this.cambiandoCancion = false;
-        this.wasPlaying = false; 
-      },
-      error: () => this.cambiandoCancion = false
-    });
-  }
-
-  siguienteCancion() {
-    // Si cola vacía -> Ambiente
-    if (this.colaReproduccion.length === 0) {
-        console.log("Cola vacía. Volviendo a ambiente...");
-        this.cancionSonando = null; 
-        this.reproducirFondo();
-        this.cambiandoCancion = false;
-        return;
-    }
-    
-    if (this.cambiandoCancion) return;
-    this.cambiandoCancion = true;
-
-    if (this.cancionSonando) {
-        this.gramolaService.actualizarEstado(Number(this.cancionSonando.id), 'TERMINADA').subscribe();
-    }
-
-    const siguiente = this.colaReproduccion[0];
-    this.colaReproduccion.shift(); // Quitar de la lista visual localmente
-    this.reproducir(siguiente);
   }
 
   logout() {
