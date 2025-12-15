@@ -27,8 +27,6 @@ public class SpotifyController {
         try {
             Long barId = Long.valueOf(state);
             spotifyService.exchangeCodeForToken(code, barId);
-            
-            // REDIRECCIÓN CORRECTA: Volver a la pantalla de configuración
             return new RedirectView("http://localhost:4200/config-audio?status=success");
         } catch (Exception e) {
             return new RedirectView("http://localhost:4200/config-audio?status=error");
@@ -45,24 +43,22 @@ public class SpotifyController {
         }
     }
 
-    // MODIFICADO: Aceptar parámetro 'type'
     @GetMapping("/search")
     public ResponseEntity<?> search(@RequestParam String q, @RequestParam Long barId, @RequestParam(defaultValue = "track") String type) {
         return ResponseEntity.ok(spotifyService.search(q, type, barId));
     }
     
-    // MODIFICADO: Lógica para reproducir Playlist o Canción
     @PostMapping("/play")
     public ResponseEntity<?> play(@RequestBody Map<String, Object> payload) {
         Long barId = Long.valueOf(payload.get("barId").toString());
         String deviceId = (String) payload.get("deviceId");
         
         try {
-            // Si el frontend manda 'contextUri', es una playlist
             if (payload.containsKey("contextUri")) {
-                spotifyService.playContext((String) payload.get("contextUri"), deviceId, barId);
+                // Leemos el offset si existe
+                String offsetUri = (String) payload.get("offsetUri");
+                spotifyService.playContext((String) payload.get("contextUri"), deviceId, barId, offsetUri);
             } else {
-                // Si manda 'spotifyId', es una canción suelta
                 String spotifyId = (String) payload.get("spotifyId");
                 spotifyService.playTrack("spotify:track:" + spotifyId, deviceId, barId);
             }

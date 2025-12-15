@@ -21,7 +21,6 @@ export class SpotifyConnectService {
     });
   }
 
-  // MÉTODO NUEVO: Soporta búsqueda de 'track' o 'playlist'
   search(query: string, barId: number, type: string = 'track'): Observable<any> {
     return this.http.get(`${this.apiUrl}/search`, { 
       params: { q: query, barId: barId.toString(), type: type } 
@@ -32,8 +31,13 @@ export class SpotifyConnectService {
     return this.http.post(`${this.apiUrl}/play`, { barId, deviceId, spotifyId });
   }
 
-  // MÉTODO NUEVO: Reproducir contexto (Playlist)
-  playContext(contextUri: string, deviceId: string, barId: number): Observable<any> {
-    return this.http.post(`${this.apiUrl}/play`, { barId, deviceId, contextUri });
+  // MÉTODO ACTUALIZADO: offsetUri es opcional
+  playContext(contextUri: string, deviceId: string, barId: number, offsetUri?: string): Observable<any> {
+    return this.http.post(`${this.apiUrl}/play`, { 
+      barId, 
+      deviceId, 
+      contextUri,
+      offsetUri // Se enviará al backend
+    });
   }
 }
