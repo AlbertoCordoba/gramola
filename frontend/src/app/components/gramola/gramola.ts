@@ -30,7 +30,7 @@ export class Gramola implements OnInit, OnDestroy {
   private spotifyService = inject(SpotifyConnectService);
   private gramolaService = inject(GramolaService);
   
-  // INYECCIONES CLAVE PARA LA VISTA
+  // INYECCIÓN DE SERVICIOS PARA LA UI
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
   
@@ -86,11 +86,10 @@ export class Gramola implements OnInit, OnDestroy {
 
     if (this.usuario) {
       this.initSpotifySDK();
-      this.cargarCola(); // Carga inicial
+      this.cargarCola(); 
       
-      // INTERVALO DE ACTUALIZACIÓN
+      // INTERVALO DE ACTUALIZACIÓN DE COLA
       this.pollingInterval = setInterval(() => {
-        // Solo actualizamos si no estamos en medio de una transición de canción
         if (!this.changingTrack) {
           this.cargarCola();
         }
@@ -138,12 +137,12 @@ export class Gramola implements OnInit, OnDestroy {
       });
     });
 
-    // --- CORRECCIÓN CRÍTICA AQUÍ ---
-    // Detectar cambios de estado (canción termina, pause, play) y actualizar VISTA
+    // LISTENER DE CAMBIO DE ESTADO (CANCION, PAUSE, PLAY)
     this.player.addListener('player_state_changed', (state: any) => {
       this.ngZone.run(() => {
         this.gestionarCambioDeEstado(state);
-        this.cdr.detectChanges(); // <--- ¡ESTO FALTABA! Actualiza la carátula al instante
+        // ¡IMPORTANTE! Forzar actualización visual inmediata
+        this.cdr.detectChanges(); 
       });
     });
 
@@ -165,20 +164,19 @@ export class Gramola implements OnInit, OnDestroy {
 
     if (this.changingTrack) return;
 
-    // Lógica Ambiente -> Pedido
+    // AMBIENTE -> Detectamos cambio
     if (this.modoReproduccion === 'AMBIENTE') {
       if (this.lastTrackId && currentTrackId !== this.lastTrackId) {
         if (this.colaReproduccion.length > 0) {
-          console.log("Detectado cambio en ambiente con pedidos en cola. Interrumpiendo...");
+          console.log("Cambio en ambiente. Pasando a pedidos...");
           this.resumeTrackUri = currentTrackUri;
           this.procesarSiguientePedido();
         } 
       }
     }
 
-    // Lógica Pedido -> Fin -> Siguiente/Ambiente
+    // PEDIDO -> Canción termina
     if (this.modoReproduccion === 'PEDIDO') {
-      // Si la canción termina (pausa en posición 0 al final del track)
       if (isPaused && position === 0 && this.lastTrackId === currentTrackId) {
         console.log("Pedido terminado.");
         this.finalizarPedidoActual();
@@ -186,7 +184,7 @@ export class Gramola implements OnInit, OnDestroy {
         if (this.colaReproduccion.length > 0) {
           this.procesarSiguientePedido();
         } else {
-          console.log("Cola vacía. Volviendo al ambiente.");
+          console.log("Cola vacía. Ambiente.");
           this.reproducirAmbiente();
         }
       }
@@ -208,7 +206,7 @@ export class Gramola implements OnInit, OnDestroy {
       next: () => {
         setTimeout(() => {
             this.changingTrack = false;
-            this.cdr.detectChanges(); // Refrescar estado visual
+            this.cdr.detectChanges();
         }, 1000);
       },
       error: () => this.changingTrack = false
@@ -231,7 +229,7 @@ export class Gramola implements OnInit, OnDestroy {
         
         setTimeout(() => {
             this.changingTrack = false;
-            this.cdr.detectChanges(); // IMPORTANTE: Actualizar vista (quitar de la cola visual)
+            this.cdr.detectChanges();
         }, 1500);
       },
       error: (e) => {
@@ -249,25 +247,23 @@ export class Gramola implements OnInit, OnDestroy {
     }
   }
 
-  // --- GESTIÓN DE COLA (SIEMPRE ACTUALIZA VISTA AHORA) ---
+  // --- COLA Y BÚSQUEDA ---
+
   cargarCola() {
     this.gramolaService.obtenerCola(Number(this.usuario.id)).subscribe({
       next: (res: any) => {
         this.ngZone.run(() => {
           if (this.cancionSonando) {
-            // Filtramos la que suena para no duplicarla visualmente
             this.colaReproduccion = res.filter((c: any) => c.id !== this.cancionSonando.id);
           } else {
             this.colaReproduccion = res;
           }
-          // ¡CLAVE! Forzar repintado siempre que lleguen datos del intervalo
-          this.cdr.detectChanges();
+          this.cdr.detectChanges(); // Asegurar refresco en intervalo
         });
       }
     });
   }
 
-  // --- BUSCADOR ---
   search() {
     if (!this.busqueda || this.busqueda.trim().length <= 2) return;
     this.isSearching = true; 
@@ -280,7 +276,6 @@ export class Gramola implements OnInit, OnDestroy {
             this.searchResults = res.tracks.items;
           }
           this.isSearching = false;
-          // Forzar actualización inmediata de resultados
           this.cdr.detectChanges(); 
         });
       },
@@ -310,13 +305,19 @@ export class Gramola implements OnInit, OnDestroy {
     this.showPaymentModal = true;
   }
 
+  // CIERRE DE PAGO (Aquí actualizamos al añadir)
   onPaymentClosed(success: boolean) {
     this.showPaymentModal = false;
+    
     if (success) {
       this.busqueda = '';
       this.searchResults = [];
-      // Al cerrar el pago, recargamos la cola y refrescamos vista
-      this.cargarCola(); 
+      
+      // Forzamos actualización de cola y vista
+      this.ngZone.run(() => {
+        this.cargarCola(); 
+        this.cdr.detectChanges();
+      });
     }
   }
 

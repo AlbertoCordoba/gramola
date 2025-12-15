@@ -1,44 +1,61 @@
-/* --- VARIABLES GLOBALES (Tema Dark Spotify) --- */
+/* --- FUENTES E IMPORTACIONES --- */
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;600;700;800&display=swap');
+
+/* --- VARIABLES GLOBALES (Tema Dark Spotify Neon) --- */
 :root {
-  --primary: #1ed760;       /* Verde Spotify */
-  --primary-dark: #169c46;
-  --bg-color: #121212;      /* Fondo muy oscuro */
-  --card-bg: rgba(255, 255, 255, 0.05); /* Cristal */
+  --primary: #1ed760;       
+  --primary-glow: rgba(30, 215, 96, 0.5);
+  --bg-color: #121212;      
+  --card-bg: rgba(255, 255, 255, 0.05); 
   --input-bg: rgba(255, 255, 255, 0.1);
   --text-main: #ffffff;
   --text-sec: #b3b3b3;
   --border-glass: rgba(255, 255, 255, 0.1);
-  --shadow-lg: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  --shadow-lg: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
 }
 
-/* Reset básico para asegurar fondo oscuro en toda la app */
+/* Reset básico */
 body, html {
   height: 100%;
   margin: 0;
   background-color: var(--bg-color);
-  background-image: radial-gradient(circle at 50% -20%, #2a2a2a, #121212); /* Sutil degradado */
+  background-image: radial-gradient(circle at 50% -20%, #2a2a2a, #000000); 
   color: var(--text-main);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Montserrat', sans-serif; /* APLICAMOS LA FUENTE */
+  overflow-x: hidden;
 }
 
-/* Clases de utilidad para Inputs y Botones */
+/* --- SCROLLBAR PERSONALIZADO (Chrome/Edge/Safari) --- */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.02); 
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15); 
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3); 
+}
+
+/* Clases de utilidad */
 input {
   background: var(--input-bg) !important;
   border: 1px solid var(--border-glass) !important;
   color: white !important;
-  border-radius: 4px;
+  border-radius: 8px;
+  font-family: 'Montserrat', sans-serif;
 }
 
 input:focus {
   outline: none;
   border-color: var(--primary) !important;
   background: rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 0 15px var(--primary-glow);
 }
 
-a {
-  color: var(--text-sec);
-  transition: 0.3s;
-}
-a:hover {
-  color: var(--primary);
-}
+a { color: var(--text-sec); transition: 0.3s; text-decoration: none; }
+a:hover { color: var(--primary); }
