@@ -1,74 +1,88 @@
 <div class="pasarela-container" [class.modal-mode]="isModal">
   <div class="checkout-card">
-    <div class="header">
-      <h2>Pasarela de Pago Segura</h2>
-      <div class="secure-icon">🔒 SSL Encrypted</div>
-    </div>
-
-    <div class="summary">
-      <div class="item-info">
-        <span class="label">Concepto:</span>
-        <span class="value">{{ datosPago?.concepto }}</span>
-      </div>
-      <div class="total-row">
-        <span>Total a pagar:</span>
-        <span class="amount">{{ datosPago?.precio | number:'1.2-2' }} €</span>
-      </div>
-    </div>
-
-    <div class="card-form">
-      
-      <div class="form-group">
-        <label>Titular de la Tarjeta</label>
-        <input type="text" [(ngModel)]="cardName" placeholder="NOMBRE APELLIDOS" class="input-card">
+    
+    <div *ngIf="!pagoRealizado">
+      <div class="header">
+        <h2>Pasarela de Pago Segura</h2>
+        <div class="secure-icon">🔒 SSL Encrypted</div>
       </div>
 
-      <div class="form-group">
-        <label>Número de Tarjeta</label>
-        <div class="card-input-wrapper">
-          <input type="text" [ngModel]="cardNumber" (input)="validateCardNumber($event)" 
-                 placeholder="0000 0000 0000 0000" maxlength="19" class="input-card"
-                 [class.input-error]="errCard">
-          <span class="card-brand">💳</span>
+      <div class="summary">
+        <div class="item-info">
+          <span class="label">Concepto:</span>
+          <span class="value">{{ datosPago?.concepto }}</span>
         </div>
-        <small class="field-error" *ngIf="errCard">{{ errCard }}</small>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group half">
-          <label>Caducidad</label>
-          <input type="text" [ngModel]="cardExpiry" (input)="validateExpiry($event)" 
-                 placeholder="MM/AA" maxlength="5" class="input-card"
-                 [class.input-error]="errDate">
-          <small class="field-error" *ngIf="errDate">{{ errDate }}</small>
-        </div>
-
-        <div class="form-group half">
-          <label>CVV</label>
-          <input type="password" [ngModel]="cardCvv" (input)="validateCvv($event)" 
-                 placeholder="123" maxlength="3" class="input-card"
-                 [class.input-error]="errCvv">
-          <small class="field-error" *ngIf="errCvv">{{ errCvv }}</small>
+        <div class="total-row">
+          <span>Total a pagar:</span>
+          <span class="amount">{{ datosPago?.precio | number:'1.2-2' }} €</span>
         </div>
       </div>
+
+      <div class="card-form">
+        <div class="form-group">
+          <label>Titular de la Tarjeta</label>
+          <input type="text" [(ngModel)]="cardName" placeholder="NOMBRE APELLIDOS" class="input-card">
+        </div>
+
+        <div class="form-group">
+          <label>Número de Tarjeta</label>
+          <div class="card-input-wrapper">
+            <input type="text" [ngModel]="cardNumber" (input)="validateCardNumber($event)" 
+                   placeholder="0000 0000 0000 0000" maxlength="19" class="input-card"
+                   [class.input-error]="errCard">
+            <span class="card-brand">💳</span>
+          </div>
+          <small class="field-error" *ngIf="errCard">{{ errCard }}</small>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Caducidad (MM/AA)</label>
+            <input type="text" [ngModel]="cardExpiry" (input)="validateExpiry($event)" 
+                   placeholder="MM/AA" maxlength="5" class="input-card"
+                   [class.input-error]="errDate">
+            <small class="field-error" *ngIf="errDate">{{ errDate }}</small>
+          </div>
+
+          <div class="form-group half">
+            <label>CVV</label>
+            <input type="password" [ngModel]="cardCvv" (input)="validateCvv($event)" 
+                   placeholder="123" maxlength="3" class="input-card"
+                   [class.input-error]="errCvv">
+            <small class="field-error" *ngIf="errCvv">{{ errCvv }}</small>
+          </div>
+        </div>
+      </div>
+
+      <div class="dev-controls">
+        <label class="error-toggle">
+          <input type="checkbox" [(ngModel)]="simularFallo">
+          <span>🧪 Simular Fallo del Banco</span>
+        </label>
+      </div>
+
+      <div *ngIf="errorGeneral" class="error-banner">
+        {{ errorGeneral }}
+      </div>
+
+      <div class="actions">
+        <button (click)="cancelar()" class="btn-cancel">Cancelar</button>
+        <button (click)="confirmarPago()" class="btn-pay" [disabled]="procesando">
+          {{ procesando ? 'Procesando...' : 'Pagar Ahora' }}
+        </button>
+      </div>
     </div>
 
-    <div class="dev-controls">
-      <label class="error-toggle">
-        <input type="checkbox" [(ngModel)]="simularFallo">
-        <span>🧪 Simular Fallo del Banco</span>
-      </label>
+    <div class="success-view" *ngIf="pagoRealizado">
+      <div class="success-icon-container">
+        <svg class="checkmark" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 52 52">
+          <circle class="checkmark__circle" cx="26" cy="26" r="25" fill="none"/>
+          <path class="checkmark__check" fill="none" d="M14.1 27.2l7.1 7.2 16.7-16.8"/>
+        </svg>
+      </div>
+      <h3>¡Pago Realizado!</h3>
+      <p>Operación completada con éxito.</p>
     </div>
 
-    <div *ngIf="errorGeneral" class="error-banner">
-      {{ errorGeneral }}
-    </div>
-
-    <div class="actions">
-      <button (click)="cancelar()" class="btn-cancel">Cancelar</button>
-      <button (click)="confirmarPago()" class="btn-pay" [disabled]="procesando">
-        {{ procesando ? 'Procesando...' : 'Pagar Ahora' }}
-      </button>
-    </div>
   </div>
 </div>

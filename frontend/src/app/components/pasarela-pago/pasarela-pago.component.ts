@@ -1,4 +1,4 @@
-import { Component, inject, OnInit, Input, Output, EventEmitter } from '@angular/core';
+import { Component, inject, OnInit, Input, Output, EventEmitter, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -16,6 +16,7 @@ export class PasarelaPagoComponent implements OnInit {
   private pagoState = inject(PagoStateService);
   private http = inject(HttpClient);
   private router = inject(Router);
+  private cdr = inject(ChangeDetectorRef); // Importante para actualizar la vista
 
   @Input() isModal: boolean = false; 
   @Output() close = new EventEmitter<boolean>(); 
@@ -23,6 +24,9 @@ export class PasarelaPagoComponent implements OnInit {
   datosPago: any;
   simularFallo: boolean = false;
   procesando: boolean = false;
+  
+  // Variable para controlar qué pantalla se ve (Formulario vs Éxito)
+  pagoRealizado: boolean = false;
   
   // Mensajes de error
   errorGeneral: string = '';
@@ -38,43 +42,36 @@ export class PasarelaPagoComponent implements OnInit {
 
   ngOnInit() {
     this.datosPago = this.pagoState.getPago();
+    // Si no hay datos de pago (por ej. recarga de página), volvemos atrás
     if (!this.datosPago) {
       this.cancelar();
     }
   }
 
-  // --- VALIDACIONES EN TIEMPO REAL ---
+  // --- VALIDACIONES ---
 
   validateCardNumber(event: any) {
     const input = event.target.value;
-    
-    // 1. Detectar letras
+    // Solo permitir números
     if (/[a-zA-Z]/.test(input)) {
-      this.errCard = '❌ Solo números permitidos';
-      return; 
+      this.errCard = '❌ Solo números';
     } else {
       this.errCard = '';
     }
-
-    // 2. Limpiar y limitar a 16 dígitos
-    const clean = input.replace(/\D/g, '');
-    const truncated = clean.substring(0, 16); // MÁXIMO 16 DÍGITOS
-
-    // 3. Formatear (Espacios cada 4 números)
-    this.cardNumber = truncated.replace(/(\d{4})(?=\d)/g, '$1 ');
+    // Formato con espacios
+    const clean = input.replace(/\D/g, '').substring(0, 16);
+    this.cardNumber = clean.replace(/(\d{4})(?=\d)/g, '$1 ');
   }
 
   validateExpiry(event: any) {
     const input = event.target.value;
-
+    
+    // Solo permitir números
     if (/[a-zA-Z]/.test(input)) {
       this.errDate = '❌ Solo números';
-      return;
-    } else {
-      this.errDate = '';
-    }
+    } 
 
-    // Formato MM/AA automático
+    // Formato MM/AA
     let clean = input.replace(/\D/g, '');
     if (clean.length > 4) clean = clean.substring(0, 4);
 
@@ -83,45 +80,70 @@ export class PasarelaPagoComponent implements OnInit {
     } else {
       this.cardExpiry = clean;
     }
+
+    // Validar lógica de fecha (Pasado)
+    this.checkFechaValida();
+  }
+
+  checkFechaValida(): boolean {
+    this.errDate = ''; // Resetear error
+    if (this.cardExpiry.length === 5) {
+      const parts = this.cardExpiry.split('/');
+      const mes = parseInt(parts[0], 10);
+      const anio = parseInt(parts[1], 10); // 2 dígitos
+
+      if (mes < 1 || mes > 12) {
+        this.errDate = 'Mes inválido';
+        return false;
+      }
+
+      const fechaActual = new Date();
+      // Año actual en 2 dígitos
+      const anioActual = parseInt(fechaActual.getFullYear().toString().slice(-2));
+      const mesActual = fechaActual.getMonth() + 1;
+
+      // Comprobar si es pasado
+      if (anio < anioActual) {
+        this.errDate = 'Tarjeta caducada';
+        return false;
+      } else if (anio === anioActual && mes < mesActual) {
+        this.errDate = 'Tarjeta caducada';
+        return false;
+      }
+      return true;
+    }
+    return false;
   }
 
   validateCvv(event: any) {
     const input = event.target.value;
-
-    if (/[a-zA-Z]/.test(input)) {
-      this.errCvv = '❌ Solo números';
-      return;
-    } else {
-      this.errCvv = '';
-    }
-
-    // Limitar a 3 dígitos (Estricto)
-    let clean = input.replace(/\D/g, '');
-    if (clean.length > 3) clean = clean.substring(0, 3);
+    if (/[a-zA-Z]/.test(input)) this.errCvv = '❌ Solo números';
+    else this.errCvv = '';
+    
+    let clean = input.replace(/\D/g, '').substring(0, 3);
     this.cardCvv = clean;
   }
 
-  // ---------------------------
+  // --- ACCIONES ---
 
   confirmarPago() {
-    // Validaciones finales antes de enviar
-    if (this.errCard || this.errDate || this.errCvv) {
-      this.errorGeneral = 'Por favor, corrige los errores.';
-      return;
+    // Validar fecha antes de enviar
+    if (!this.checkFechaValida()) {
+        if (!this.errDate) this.errDate = 'Fecha incompleta';
+        return;
     }
 
-    // Comprobamos longitudes exactas
-    if (this.cardNumber.replace(/\s/g, '').length !== 16) {
-      this.errCard = 'Deben ser 16 números';
+    if (this.errCard || this.errDate || this.errCvv) {
+      this.errorGeneral = 'Corrige los errores antes de pagar.';
       return;
     }
-    if (this.cardExpiry.length !== 5) { // 2 mes + 1 barra + 2 año
-      this.errDate = 'Incompleto (MM/AA)';
-      return;
+    
+    // Validar longitud exacta
+    if (this.cardNumber.replace(/\s/g, '').length !== 16) {
+        this.errCard = 'Faltan números'; return;
     }
     if (this.cardCvv.length !== 3) {
-      this.errCvv = 'Deben ser 3 dígitos';
-      return;
+        this.errCvv = 'Incompleto'; return;
     }
 
     this.procesando = true;
@@ -141,12 +163,16 @@ export class PasarelaPagoComponent implements OnInit {
 
     this.http.post(url, finalPayload).subscribe({
       next: (res) => {
+        this.procesando = false;
+        
+        // 1. CAMBIAR LA PANTALLA A ÉXITO
+        this.pagoRealizado = true;
+        this.cdr.detectChanges(); // Forzar actualización de vista
+
+        // 2. ESPERAR Y CERRAR
         setTimeout(() => {
-          this.procesando = false;
-          alert('✅ Pago realizado con éxito.');
-          
           if (this.isModal) {
-            this.close.emit(true); // Cierra el modal sin recargar página
+            this.close.emit(true);
           } else {
             if (this.datosPago.tipo === 'CANCION') {
                 this.router.navigate(['/gramola']);
@@ -155,13 +181,12 @@ export class PasarelaPagoComponent implements OnInit {
             }
           }
           this.pagoState.clear();
-        }, 1500);
+        }, 2500); // 2.5 segundos para ver la animación
       },
       error: (err) => {
-        setTimeout(() => {
-          this.procesando = false;
-          this.errorGeneral = err.error?.error || 'Error procesando el pago.';
-        }, 1000);
+        this.procesando = false;
+        this.errorGeneral = err.error?.error || 'Error procesando el pago.';
+        this.cdr.detectChanges();
       }
     });
   }
