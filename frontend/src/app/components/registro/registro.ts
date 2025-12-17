@@ -1,4 +1,4 @@
-import { Component, inject, ViewChild, ElementRef, AfterViewInit } from '@angular/core';
+import { Component, inject, ViewChild, ElementRef, AfterViewInit, ChangeDetectorRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { CommonModule } from '@angular/common';
@@ -14,8 +14,8 @@ import { BarService } from '../../services/bar';
 export class Registro implements AfterViewInit {
   private barService = inject(BarService);
   private router = inject(Router);
+  private cdr = inject(ChangeDetectorRef); // Inyectamos el detector de cambios
 
-  // Referencia al Canvas
   @ViewChild('firmaCanvas', { static: false }) canvasRef!: ElementRef<HTMLCanvasElement>;
   private cx!: CanvasRenderingContext2D | null;
   private isDrawing = false;
@@ -27,7 +27,7 @@ export class Registro implements AfterViewInit {
     confirmPassword: '',
     latitud: 0,
     longitud: 0,
-    firmaBase64: '' // Aquí guardamos la imagen
+    firmaBase64: '' 
   };
 
   errorMessage: string = '';
@@ -36,20 +36,16 @@ export class Registro implements AfterViewInit {
   ngAfterViewInit() {
     const canvas = this.canvasRef.nativeElement;
     this.cx = canvas.getContext('2d');
-
     if (!this.cx) return;
-
     this.cx.lineWidth = 3;
     this.cx.lineCap = 'round';
     this.cx.strokeStyle = '#000';
 
-    // Eventos Ratón
     canvas.addEventListener('mousedown', (e) => this.startDrawing(e));
     canvas.addEventListener('mousemove', (e) => this.draw(e));
     canvas.addEventListener('mouseup', () => this.stopDrawing());
     canvas.addEventListener('mouseleave', () => this.stopDrawing());
 
-    // Eventos Táctiles (Móvil)
     canvas.addEventListener('touchstart', (e) => { e.preventDefault(); this.startDrawing(e.touches[0]); });
     canvas.addEventListener('touchmove', (e) => { e.preventDefault(); this.draw(e.touches[0]); });
     canvas.addEventListener('touchend', () => this.stopDrawing());
@@ -65,7 +61,6 @@ export class Registro implements AfterViewInit {
     const rect = this.canvasRef.nativeElement.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-
     this.cx.lineTo(x, y);
     this.cx.stroke();
     this.cx.beginPath();
@@ -91,21 +86,33 @@ export class Registro implements AfterViewInit {
   }
 
   obtenerUbicacion() {
+    this.errorMessage = '';
+    this.successMessage = '';
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
         this.registroData.latitud = pos.coords.latitude;
         this.registroData.longitud = pos.coords.longitude;
-        alert('Ubicación detectada.');
-      }, () => alert('Error obteniendo ubicación.'));
+        this.successMessage = 'Ubicación detectada correctamente.';
+        
+        // FORZAMOS A ANGULAR A ACTUALIZAR LA VISTA
+        this.cdr.detectChanges(); 
+      }, (err) => {
+        this.errorMessage = 'Error obteniendo ubicación. Asegúrate de dar permisos.';
+        this.cdr.detectChanges(); // También en caso de error
+      });
+    } else {
+      this.errorMessage = 'Tu navegador no soporta geolocalización.';
     }
   }
 
   onRegistro() {
+    this.errorMessage = '';
+    this.successMessage = '';
     if (this.registroData.password !== this.registroData.confirmPassword) {
       this.errorMessage = 'Contraseñas no coinciden.';
       return;
     }
-
     this.barService.registro(this.registroData).subscribe({
       next: () => {
         this.successMessage = '¡Cuenta creada! Revisa tu email.';

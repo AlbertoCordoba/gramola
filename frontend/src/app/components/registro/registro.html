@@ -34,14 +34,14 @@
         <button type="button" class="btn-geo" (click)="obtenerUbicacion()">📍 Detectar</button>
       </div>
 
+      <div *ngIf="errorMessage" class="msg error">{{ errorMessage }}</div>
+      <div *ngIf="successMessage" class="msg success">{{ successMessage }}</div>
+
       <div class="form-group canvas-container">
         <label class="canvas-title">Firma del Propietario</label>
         <canvas #firmaCanvas width="400" height="150"></canvas>
         <button type="button" class="btn-clear" (click)="limpiarFirma()">Borrar Firma</button>
       </div>
-
-      <div *ngIf="errorMessage" class="msg error">{{ errorMessage }}</div>
-      <div *ngIf="successMessage" class="msg success">{{ successMessage }}</div>
 
       <button type="submit" class="btn-submit">Registrarse</button>
     </form>

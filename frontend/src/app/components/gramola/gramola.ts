@@ -2,7 +2,7 @@ import { Component, inject, OnDestroy, OnInit, NgZone, ChangeDetectorRef } from 
 import { Router, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient } from '@angular/common/http';
+import { Title } from '@angular/platform-browser'; // IMPORTADO PARA LA PESTAÑA
 import { SpotifyConnectService } from '../../services/spotify.service';
 import { GramolaService } from '../../services/gramola.service';
 import { PagoStateService } from '../../services/pago-state.service';
@@ -29,11 +29,10 @@ export class Gramola implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private spotifyService = inject(SpotifyConnectService);
   private gramolaService = inject(GramolaService);
+  private titleService = inject(Title); // INYECTADO
   
-  // INYECCIÓN DE SERVICIOS PARA LA UI
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
-  
   private pagoState = inject(PagoStateService);
 
   usuario: any = null;
@@ -47,7 +46,6 @@ export class Gramola implements OnInit, OnDestroy {
   player: any;
   deviceId: string = '';
   
-  // Estado de reproducción
   currentTrack: any = null;
   isPaused: boolean = false;
   modoReproduccion: ModoReproduccion = 'AMBIENTE';
@@ -88,7 +86,6 @@ export class Gramola implements OnInit, OnDestroy {
       this.initSpotifySDK();
       this.cargarCola(); 
       
-      // INTERVALO DE ACTUALIZACIÓN DE COLA
       this.pollingInterval = setInterval(() => {
         if (!this.changingTrack) {
           this.cargarCola();
@@ -137,11 +134,9 @@ export class Gramola implements OnInit, OnDestroy {
       });
     });
 
-    // LISTENER DE CAMBIO DE ESTADO (CANCION, PAUSE, PLAY)
     this.player.addListener('player_state_changed', (state: any) => {
       this.ngZone.run(() => {
         this.gestionarCambioDeEstado(state);
-        // ¡IMPORTANTE! Forzar actualización visual inmediata
         this.cdr.detectChanges(); 
       });
     });
@@ -149,42 +144,62 @@ export class Gramola implements OnInit, OnDestroy {
     this.player.connect();
   }
 
-  // --- LÓGICA DE REPRODUCCIÓN ---
+  // --- LÓGICA DE MULTIMEDIA (BRAVE / SISTEMA) ---
+  private actualizarInfoMultimedia(track: any) {
+    if (!track) return;
+
+    const nombre = track.name;
+    const artista = track.artists[0]?.name || 'Desconocido';
+    const imagen = track.album.images[0]?.url || 'gramola.png';
+
+    // 1. Actualizar título de la pestaña
+    this.titleService.setTitle(`▶️ ${nombre} - ${artista}`);
+
+    // 2. Actualizar Media Session API (Brave / Windows / Mac)
+    if ('mediaSession' in navigator) {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: nombre,
+        artist: artista,
+        album: 'Gramola Virtual',
+        artwork: [{ src: imagen, sizes: '512x512', type: 'image/png' }]
+      });
+    }
+  }
 
   gestionarCambioDeEstado(state: any) {
     if (!state) return;
 
-    const currentTrackId = state.track_window.current_track?.id;
-    const currentTrackUri = state.track_window.current_track?.uri;
+    const currentTrack = state.track_window.current_track;
+    const currentTrackId = currentTrack?.id;
+    const currentTrackUri = currentTrack?.uri;
     const isPaused = state.paused;
     const position = state.position;
 
-    this.currentTrack = state.track_window.current_track;
+    this.currentTrack = currentTrack;
     this.isPaused = isPaused;
+
+    // Si la canción ha cambiado, actualizamos la info de la pestaña y Brave
+    if (currentTrackId !== this.lastTrackId) {
+      this.actualizarInfoMultimedia(currentTrack);
+    }
 
     if (this.changingTrack) return;
 
-    // AMBIENTE -> Detectamos cambio
     if (this.modoReproduccion === 'AMBIENTE') {
       if (this.lastTrackId && currentTrackId !== this.lastTrackId) {
         if (this.colaReproduccion.length > 0) {
-          console.log("Cambio en ambiente. Pasando a pedidos...");
           this.resumeTrackUri = currentTrackUri;
           this.procesarSiguientePedido();
         } 
       }
     }
 
-    // PEDIDO -> Canción termina
     if (this.modoReproduccion === 'PEDIDO') {
       if (isPaused && position === 0 && this.lastTrackId === currentTrackId) {
-        console.log("Pedido terminado.");
         this.finalizarPedidoActual();
-        
         if (this.colaReproduccion.length > 0) {
           this.procesarSiguientePedido();
         } else {
-          console.log("Cola vacía. Ambiente.");
           this.reproducirAmbiente();
         }
       }
@@ -247,8 +262,6 @@ export class Gramola implements OnInit, OnDestroy {
     }
   }
 
-  // --- COLA Y BÚSQUEDA ---
-
   cargarCola() {
     this.gramolaService.obtenerCola(Number(this.usuario.id)).subscribe({
       next: (res: any) => {
@@ -258,7 +271,7 @@ export class Gramola implements OnInit, OnDestroy {
           } else {
             this.colaReproduccion = res;
           }
-          this.cdr.detectChanges(); // Asegurar refresco en intervalo
+          this.cdr.detectChanges();
         });
       }
     });
@@ -280,7 +293,6 @@ export class Gramola implements OnInit, OnDestroy {
         });
       },
       error: (err) => {
-        console.error("Error búsqueda:", err);
         this.isSearching = false;
         this.cdr.detectChanges();
       }
@@ -305,15 +317,11 @@ export class Gramola implements OnInit, OnDestroy {
     this.showPaymentModal = true;
   }
 
-  // CIERRE DE PAGO (Aquí actualizamos al añadir)
   onPaymentClosed(success: boolean) {
     this.showPaymentModal = false;
-    
     if (success) {
       this.busqueda = '';
       this.searchResults = [];
-      
-      // Forzamos actualización de cola y vista
       this.ngZone.run(() => {
         this.cargarCola(); 
         this.cdr.detectChanges();
@@ -331,5 +339,6 @@ export class Gramola implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.player?.disconnect();
     if (this.pollingInterval) clearInterval(this.pollingInterval);
+    this.titleService.setTitle('Gramola'); // RESET AL SALIR
   }
 }
