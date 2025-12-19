@@ -28,17 +28,23 @@ public class GramolaController {
 
     @GetMapping("/cola/{barId}")
     public ResponseEntity<?> verCola(@PathVariable Long barId) {
+        // Devuelve solo canciones con estado 'COLA' gracias al repository
         return ResponseEntity.ok(gramolaService.obtenerCola(barId));
     }
 
-    // NUEVO ENDPOINT: Para que el frontend avise cuando una canción empieza/termina
+    /**
+     * Endpoint para cambiar el estado de una canción (COLA -> SONANDO -> TERMINADA)
+     */
     @PostMapping("/cola/estado")
     public ResponseEntity<?> cambiarEstado(@RequestBody Map<String, Object> payload) {
-        // Convertimos el ID de String/Integer a Long para la BD
-        Long id = Long.valueOf(payload.get("id").toString());
-        String estado = (String) payload.get("estado");
-        
-        gramolaService.actualizarEstado(id, estado);
-        return ResponseEntity.ok().build();
+        try {
+            Long id = Long.valueOf(payload.get("id").toString());
+            String estado = (String) payload.get("estado");
+            
+            gramolaService.actualizarEstado(id, estado);
+            return ResponseEntity.ok(Collections.singletonMap("mensaje", "Estado actualizado"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
+        }
     }
 }

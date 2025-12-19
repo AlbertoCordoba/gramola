@@ -2,7 +2,7 @@ import { Component, inject, OnDestroy, OnInit, NgZone, ChangeDetectorRef } from 
 import { Router, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Title } from '@angular/platform-browser'; // IMPORTADO PARA LA PESTAÑA
+import { Title } from '@angular/platform-browser';
 import { SpotifyConnectService } from '../../services/spotify.service';
 import { GramolaService } from '../../services/gramola.service';
 import { PagoStateService } from '../../services/pago-state.service';
@@ -29,7 +29,7 @@ export class Gramola implements OnInit, OnDestroy {
   private route = inject(ActivatedRoute);
   private spotifyService = inject(SpotifyConnectService);
   private gramolaService = inject(GramolaService);
-  private titleService = inject(Title); // INYECTADO
+  private titleService = inject(Title);
   
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
@@ -144,7 +144,6 @@ export class Gramola implements OnInit, OnDestroy {
     this.player.connect();
   }
 
-  // --- LÓGICA DE MULTIMEDIA (BRAVE / SISTEMA) ---
   private actualizarInfoMultimedia(track: any) {
     if (!track) return;
 
@@ -152,10 +151,8 @@ export class Gramola implements OnInit, OnDestroy {
     const artista = track.artists[0]?.name || 'Desconocido';
     const imagen = track.album.images[0]?.url || 'gramola.png';
 
-    // 1. Actualizar título de la pestaña
     this.titleService.setTitle(`▶️ ${nombre} - ${artista}`);
 
-    // 2. Actualizar Media Session API (Brave / Windows / Mac)
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: nombre,
@@ -178,7 +175,6 @@ export class Gramola implements OnInit, OnDestroy {
     this.currentTrack = currentTrack;
     this.isPaused = isPaused;
 
-    // Si la canción ha cambiado, actualizamos la info de la pestaña y Brave
     if (currentTrackId !== this.lastTrackId) {
       this.actualizarInfoMultimedia(currentTrack);
     }
@@ -195,6 +191,7 @@ export class Gramola implements OnInit, OnDestroy {
     }
 
     if (this.modoReproduccion === 'PEDIDO') {
+      // Si la canción llega al final (pausada en posición 0)
       if (isPaused && position === 0 && this.lastTrackId === currentTrackId) {
         this.finalizarPedidoActual();
         if (this.colaReproduccion.length > 0) {
@@ -239,6 +236,7 @@ export class Gramola implements OnInit, OnDestroy {
     
     this.spotifyService.playTrack(siguienteCancion.spotifyId, this.deviceId, this.usuario.id).subscribe({
       next: () => {
+        // Marcamos como SONANDO en la BD
         this.gramolaService.actualizarEstado(Number(siguienteCancion.id), 'SONANDO').subscribe();
         this.colaReproduccion.shift(); 
         
@@ -255,10 +253,21 @@ export class Gramola implements OnInit, OnDestroy {
     });
   }
 
+  /**
+   * CORRECCIÓN: Notifica al backend y limpia el estado local una vez confirmado
+   * para que la canción desaparezca de la cola definitivamente.
+   */
   finalizarPedidoActual() {
     if (this.cancionSonando) {
-      this.gramolaService.actualizarEstado(Number(this.cancionSonando.id), 'TERMINADA').subscribe();
-      this.cancionSonando = null;
+      const idTerminado = Number(this.cancionSonando.id);
+      this.gramolaService.actualizarEstado(idTerminado, 'TERMINADA').subscribe({
+        next: () => {
+          console.log(`Canción ${idTerminado} finalizada en BD.`);
+          this.cancionSonando = null;
+          this.cargarCola(); // Recarga inmediata para limpiar la UI
+        },
+        error: (err) => console.error("Error al marcar como terminada", err)
+      });
     }
   }
 
@@ -266,6 +275,7 @@ export class Gramola implements OnInit, OnDestroy {
     this.gramolaService.obtenerCola(Number(this.usuario.id)).subscribe({
       next: (res: any) => {
         this.ngZone.run(() => {
+          // Filtramos para no mostrar la que ya está sonando (si existe)
           if (this.cancionSonando) {
             this.colaReproduccion = res.filter((c: any) => c.id !== this.cancionSonando.id);
           } else {
@@ -339,6 +349,6 @@ export class Gramola implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.player?.disconnect();
     if (this.pollingInterval) clearInterval(this.pollingInterval);
-    this.titleService.setTitle('Gramola'); // RESET AL SALIR
+    this.titleService.setTitle('Gramola'); 
   }
 }

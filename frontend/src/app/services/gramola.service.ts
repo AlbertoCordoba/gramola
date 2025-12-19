@@ -12,7 +12,7 @@ export class GramolaService {
   
   private apiUrl = 'http://localhost:8080/api/gramola';
 
-  // --- MÉTODOS PARA MULTIMEDIA (BRAVE / PESTAÑA) ---
+  // --- MÉTODOS PARA MULTIMEDIA ---
   actualizarMetadataMultimedia(track: any) {
     if (!track) return;
 
@@ -20,10 +20,8 @@ export class GramolaService {
     const artista = track.artists[0]?.name || 'Desconocido';
     const imagen = track.album?.images[0]?.url || 'gramola.png';
 
-    // Actualiza el nombre en la pestaña del navegador
     this.titleService.setTitle(`▶️ ${nombre} - ${artista}`);
 
-    // Actualiza la información en el sistema (Brave, Windows, Mac)
     if ('mediaSession' in navigator) {
       navigator.mediaSession.metadata = new MediaMetadata({
         title: nombre,
@@ -34,13 +32,17 @@ export class GramolaService {
     }
   }
 
-  // --- MÉTODOS DE LA GRAMOLA (RESTAURADOS) ---
+  // --- MÉTODOS DE LA COLA ---
   obtenerCola(barId: number): Observable<any> {
     return this.http.get(`${this.apiUrl}/cola/${barId}`);
   }
 
+  /**
+   * CORRECCIÓN: Se cambia a POST y ruta /cola/estado para coincidir con el backend.
+   * Envía un objeto con 'id' y 'estado'.
+   */
   actualizarEstado(id: number, estado: string): Observable<any> {
-    return this.http.put(`${this.apiUrl}/estado/${id}`, { estado });
+    return this.http.post(`${this.apiUrl}/cola/estado`, { id, estado });
   }
 
   getPrecios(barId: number): Observable<any> {
