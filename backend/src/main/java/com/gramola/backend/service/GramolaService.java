@@ -1,8 +1,10 @@
 package com.gramola.backend.service;
 
 import com.gramola.backend.model.CancionSolicitada;
+import com.gramola.backend.model.ConfiguracionPrecios;
 import com.gramola.backend.model.Pagos;
 import com.gramola.backend.repository.CancionSolicitadaRepository;
+import com.gramola.backend.repository.ConfiguracionPreciosRepository;
 import com.gramola.backend.repository.PagosRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -22,6 +24,8 @@ public class GramolaService {
     private PagosRepository pagosRepository;
     @Autowired
     private MockPaymentService paymentService;
+    @Autowired
+    private ConfiguracionPreciosRepository preciosRepository;
 
     @Transactional
     public CancionSolicitada anadirCancion(Map<String, Object> datos) {
@@ -31,6 +35,11 @@ public class GramolaService {
         } catch (Exception e) {
             throw new RuntimeException(e.getMessage());
         }
+
+        // --- CAMBIO: Obtener precio de la BD o usar 0.50 por defecto ---
+        BigDecimal precioCancion = preciosRepository.findByClave("PRECIO_CANCION")
+                .map(ConfiguracionPrecios::getValor)
+                .orElse(new BigDecimal("0.50"));
 
         Long barId = Long.valueOf(datos.get("barId").toString());
         CancionSolicitada cancion = new CancionSolicitada();
@@ -50,7 +59,7 @@ public class GramolaService {
         pago.setBarId(barId);
         pago.setCancionId(cancion.getId());
         pago.setConcepto("PAGO_CANCION");
-        pago.setMonto(new BigDecimal("0.50"));
+        pago.setMonto(precioCancion); // Usamos el precio dinámico
         pago.setFechaPago(LocalDateTime.now());
         pagosRepository.save(pago);
 

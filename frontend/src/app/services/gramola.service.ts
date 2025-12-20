@@ -11,6 +11,7 @@ export class GramolaService {
   private titleService = inject(Title);
   
   private apiUrl = 'http://localhost:8080/api/gramola';
+  private apiBaresUrl = 'http://localhost:8080/api/bares';
 
   // --- MÉTODOS PARA MULTIMEDIA ---
   actualizarMetadataMultimedia(track: any) {
@@ -51,5 +52,10 @@ export class GramolaService {
 
   solicitarCancion(solicitud: any): Observable<any> {
     return this.http.post(`${this.apiUrl}/solicitar`, solicitud);
+  }
+
+  // --- NUEVO: Obtener configuración de precios ---
+  obtenerConfiguracionPrecios(): Observable<any> {
+    return this.http.get(`${this.apiBaresUrl}/precios`);
   }
 }

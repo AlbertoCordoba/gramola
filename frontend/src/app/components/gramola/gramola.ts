@@ -70,6 +70,9 @@ export class Gramola implements OnInit, OnDestroy {
   private pollingInterval: any;
   private lastTrackId: string = ''; 
   private changingTrack: boolean = false; 
+  
+  // Precio Dinámico
+  precioCancion: number = 0.50; // Valor por defecto
 
   // Historial y Anti-glitch
   private songStartTime: number = 0;     
@@ -96,6 +99,7 @@ export class Gramola implements OnInit, OnDestroy {
     if (this.usuario) {
       this.initSpotifySDK();
       this.cargarCola(); 
+      this.cargarPrecioCancion(); // Cargar precio al inicio
       
       this.pollingInterval = setInterval(() => {
         if (!this.changingTrack) {
@@ -112,6 +116,17 @@ export class Gramola implements OnInit, OnDestroy {
         }
       }, 1000);
     }
+  }
+
+  cargarPrecioCancion() {
+    this.gramolaService.obtenerConfiguracionPrecios().subscribe({
+      next: (precios: any) => {
+        if (precios && precios['PRECIO_CANCION']) {
+          this.precioCancion = precios['PRECIO_CANCION'];
+        }
+      },
+      error: (e) => console.error('Error cargando precio canción', e)
+    });
   }
 
   initSpotifySDK() {
@@ -372,7 +387,7 @@ export class Gramola implements OnInit, OnDestroy {
     const previewUrl = track.preview_url || track.previewUrl || '';
     this.pagoState.setPago({
       concepto: `Canción: ${track.name}`,
-      precio: 0.50,
+      precio: this.precioCancion, // Usar precio dinámico
       tipo: 'CANCION',
       payload: {
         barId: Number(this.usuario.id),
