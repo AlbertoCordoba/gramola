@@ -20,26 +20,19 @@ public class GramolaService {
     private CancionSolicitadaRepository cancionRepository;
     @Autowired
     private PagosRepository pagosRepository;
-    
-    // INYECCIÓN DEL SERVICIO DE PAGOS
     @Autowired
     private MockPaymentService paymentService;
 
     @Transactional
     public CancionSolicitada anadirCancion(Map<String, Object> datos) {
-        // 1. PROCESAR PAGO (0.50€)
         boolean simularError = datos.containsKey("simularError") ? (boolean) datos.get("simularError") : false;
-        
         try {
             paymentService.procesarPago(simularError);
         } catch (Exception e) {
-            // Lanzamos RuntimeException para que @Transactional haga rollback
             throw new RuntimeException(e.getMessage());
         }
 
-        // 2. GUARDAR CANCIÓN (Solo si el pago fue bien)
         Long barId = Long.valueOf(datos.get("barId").toString());
-        
         CancionSolicitada cancion = new CancionSolicitada();
         cancion.setBarId(barId);
         cancion.setSpotifyId((String) datos.get("spotifyId"));
@@ -57,7 +50,6 @@ public class GramolaService {
         cancion.setEstado("COLA");
         cancion = cancionRepository.save(cancion);
 
-        // 3. REGISTRAR PAGO EN HISTÓRICO
         Pagos pago = new Pagos();
         pago.setBarId(barId);
         pago.setCancionId(cancion.getId());
@@ -71,6 +63,11 @@ public class GramolaService {
 
     public List<CancionSolicitada> obtenerCola(Long barId) {
         return cancionRepository.findByBarIdAndEstadoOrderByFechaSolicitudAsc(barId, "COLA");
+    }
+
+    // NUEVO: Método para el historial
+    public List<CancionSolicitada> obtenerHistorial(Long barId) {
+        return cancionRepository.findTop5ByBarIdAndEstadoOrderByFechaSolicitudDesc(barId, "TERMINADA");
     }
 
     @Transactional

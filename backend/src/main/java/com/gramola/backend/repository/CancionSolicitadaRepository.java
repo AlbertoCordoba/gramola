@@ -9,4 +9,7 @@ import java.util.List;
 public interface CancionSolicitadaRepository extends JpaRepository<CancionSolicitada, Long> {
     // Devuelve la cola ordenada por hora de llegada (FIFO)
     List<CancionSolicitada> findByBarIdAndEstadoOrderByFechaSolicitudAsc(Long barId, String estado);
+
+    // NUEVO: Devuelve las últimas 5 canciones que ya sonaron (Historial)
+    List<CancionSolicitada> findTop5ByBarIdAndEstadoOrderByFechaSolicitudDesc(Long barId, String estado);
 }

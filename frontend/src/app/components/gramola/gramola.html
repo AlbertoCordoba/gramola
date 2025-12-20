@@ -7,19 +7,13 @@
   
   <div class="ambient-floating-bar fade-in" *ngIf="playlistFondo">
     <div class="ambient-capsule glass-effect">
-      
       <div class="equalizer">
-        <span class="bar"></span>
-        <span class="bar"></span>
-        <span class="bar"></span>
-        <span class="bar"></span>
+        <span class="bar"></span><span class="bar"></span><span class="bar"></span><span class="bar"></span>
       </div>
-
       <div class="ambient-text">
         <span class="label-status">EN EL AIRE • CANAL DE FONDO</span>
         <span class="pl-title">{{ playlistFondo.name }}</span>
       </div>
-      
     </div>
   </div>
 
@@ -51,7 +45,7 @@
               <div class="progress-fill" [style.width.%]="progressPercent"></div>
             </div>
           </div>
-          </div>
+        </div>
       </section>
 
       <section class="search-section">
@@ -83,23 +77,43 @@
         </div>
       </div>
 
-      <section class="queue-section">
-        <h3 class="section-title">Cola de Pedidos</h3>
-        <div *ngIf="colaReproduccion.length === 0" class="empty-state-glass">
-          <div class="empty-icon">😌</div>
-          <p>No hay pedidos en espera.</p>
-        </div>
-        <div class="queue-list" *ngIf="colaReproduccion.length > 0">
-          <div class="queue-card" *ngFor="let item of colaReproduccion; let i = index">
-            <div class="q-index">{{ i + 1 }}</div>
-            <div class="q-info">
-              <span class="q-title">{{ item.titulo }}</span>
-              <span class="q-artist">{{ item.artista }}</span>
-            </div>
-            <span class="badge-wait">En espera</span>
+      <div class="lists-layout">
+        
+        <section class="queue-section">
+          <h3 class="section-title">Cola de Pedidos</h3>
+          <div *ngIf="colaReproduccion.length === 0" class="empty-state-glass">
+            <div class="empty-icon">😌</div>
+            <p>No hay pedidos en espera.</p>
           </div>
-        </div>
-      </section>
+          <div class="queue-list" *ngIf="colaReproduccion.length > 0">
+            <div class="queue-card" *ngFor="let item of colaReproduccion; let i = index">
+              <div class="q-index">{{ i + 1 }}</div>
+              <div class="q-info">
+                <span class="q-title">{{ item.titulo }}</span>
+                <span class="q-artist">{{ item.artista }}</span>
+              </div>
+              <span class="badge-wait">En espera</span>
+            </div>
+          </div>
+        </section>
+
+        <section class="history-section">
+          <h3 class="section-title">Recién Sonadas</h3>
+          <div class="history-list">
+            <div class="history-card" *ngFor="let item of historialVisual"
+                 [class.is-ambiente]="item.tipo === 'AMBIENTE'">
+              <div class="h-info">
+                <span class="h-title">{{ item.titulo }}</span>
+                <span class="h-artist">{{ item.artista }}</span>
+              </div>
+              <span class="h-check" *ngIf="item.tipo === 'PEDIDO'">💎</span>
+              <span class="h-check" *ngIf="item.tipo === 'AMBIENTE'">📻</span>
+            </div>
+            <p *ngIf="historialVisual.length === 0" class="text-muted">Sin historial reciente.</p>
+          </div>
+        </section>
+
+      </div>
 
     </div>
   </main>

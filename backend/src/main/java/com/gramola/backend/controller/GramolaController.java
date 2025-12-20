@@ -28,13 +28,15 @@ public class GramolaController {
 
     @GetMapping("/cola/{barId}")
     public ResponseEntity<?> verCola(@PathVariable Long barId) {
-        // Devuelve solo canciones con estado 'COLA' gracias al repository
         return ResponseEntity.ok(gramolaService.obtenerCola(barId));
     }
 
-    /**
-     * Endpoint para cambiar el estado de una canción (COLA -> SONANDO -> TERMINADA)
-     */
+    // NUEVO ENDPOINT HISTORIAL
+    @GetMapping("/historial/{barId}")
+    public ResponseEntity<?> verHistorial(@PathVariable Long barId) {
+        return ResponseEntity.ok(gramolaService.obtenerHistorial(barId));
+    }
+
     @PostMapping("/cola/estado")
     public ResponseEntity<?> cambiarEstado(@RequestBody Map<String, Object> payload) {
         try {

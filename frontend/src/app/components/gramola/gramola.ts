@@ -3,6 +3,7 @@ import { Router, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
+import { HttpClient } from '@angular/common/http';
 import { SpotifyConnectService } from '../../services/spotify.service';
 import { GramolaService } from '../../services/gramola.service';
 import { PagoStateService } from '../../services/pago-state.service';
@@ -25,45 +26,55 @@ type ModoReproduccion = 'AMBIENTE' | 'PEDIDO';
   styleUrl: './gramola.css'
 })
 export class Gramola implements OnInit, OnDestroy {
+  // Inyecciones
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private spotifyService = inject(SpotifyConnectService);
   private gramolaService = inject(GramolaService);
   private titleService = inject(Title);
-  
+  private http = inject(HttpClient);
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
   private pagoState = inject(PagoStateService);
 
+  // Estado Usuario
   usuario: any = null;
   playlistFondo: any = null;
 
+  // Buscador
   busqueda: string = '';
   isSearching: boolean = false;
   searchResults: any[] = [];
   
+  // Listas
   colaReproduccion: any[] = [];
+  historialVisual: any[] = []; // Historial local mixto
+
+  // Reproductor
   player: any;
   deviceId: string = '';
-  
   currentTrack: any = null;
-  isPaused: boolean = false;
+  isPaused: boolean = true;
   modoReproduccion: ModoReproduccion = 'AMBIENTE';
   cancionSonando: any = null; 
   resumeTrackUri: string = ''; 
   
-  // --- NUEVAS VARIABLES PARA LA BARRA DE PROGRESO ---
+  // Progreso
   progressMs: number = 0;
   durationMs: number = 0;
   progressPercent: number = 0;
-  private progressTimer: any; // El cronómetro local
-  // --------------------------------------------------
+  private progressTimer: any;
 
+  // Control de Flujo
   showPaymentModal: boolean = false;
-
   private pollingInterval: any;
   private lastTrackId: string = ''; 
   private changingTrack: boolean = false; 
+
+  // --- VARIABLES ANTI-GLITCH ---
+  private songStartTime: number = 0;     // Momento exacto en que empezó la canción
+  private wasPedido: boolean = false;    // Guardamos si ERA pedido al empezar (para el historial)
+  // -----------------------------
 
   constructor() {
     const userJson = localStorage.getItem('usuarioBar');
@@ -83,32 +94,26 @@ export class Gramola implements OnInit, OnDestroy {
         return;
     }
 
-    this.route.queryParams.subscribe((params: any) => {
-      if (params['status'] === 'success') {
-        this.router.navigate([], { queryParams: {}, replaceUrl: true });
-      }
-    });
-
     if (this.usuario) {
       this.initSpotifySDK();
+      
+      // Carga inicial solo de la cola (Historial empieza limpio para esta sesión)
       this.cargarCola(); 
       
+      // Polling de cola (cada 5s)
       this.pollingInterval = setInterval(() => {
         if (!this.changingTrack) {
           this.cargarCola();
         }
       }, 5000);
 
-      // --- TIMER PARA MOVER LA BARRA CADA SEGUNDO ---
+      // Timer visual de progreso (cada 1s)
       this.progressTimer = setInterval(() => {
         if (!this.isPaused && this.currentTrack) {
-          this.progressMs += 1000; // Sumamos 1 segundo localmente
-          
-          // Evitar que pase del 100% visualmente
+          this.progressMs += 1000;
           if (this.progressMs > this.durationMs) this.progressMs = this.durationMs;
-          
           this.progressPercent = (this.progressMs / this.durationMs) * 100;
-          this.cdr.detectChanges(); // Forzar actualización visual
+          this.cdr.detectChanges();
         }
       }, 1000);
     }
@@ -148,7 +153,7 @@ export class Gramola implements OnInit, OnDestroy {
 
     this.player.addListener('ready', ({ device_id }: any) => {
       this.ngZone.run(() => {
-        console.log('Player Listo. Device ID:', device_id);
+        console.log('Player Listo ID:', device_id);
         this.deviceId = device_id;
         this.reproducirAmbiente();
       });
@@ -157,69 +162,66 @@ export class Gramola implements OnInit, OnDestroy {
     this.player.addListener('player_state_changed', (state: any) => {
       this.ngZone.run(() => {
         this.gestionarCambioDeEstado(state);
-        this.cdr.detectChanges(); 
       });
     });
 
     this.player.connect();
   }
 
-  private actualizarInfoMultimedia(track: any) {
-    if (!track) return;
-
-    const nombre = track.name;
-    const artista = track.artists[0]?.name || 'Desconocido';
-    const imagen = track.album.images[0]?.url || 'gramola.png';
-
-    this.titleService.setTitle(`▶️ ${nombre} - ${artista}`);
-
-    if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({
-        title: nombre,
-        artist: artista,
-        album: 'Gramola Virtual',
-        artwork: [{ src: imagen, sizes: '512x512', type: 'image/png' }]
-      });
-    }
-  }
-
   gestionarCambioDeEstado(state: any) {
     if (!state) return;
 
-    const currentTrack = state.track_window.current_track;
-    const currentTrackId = currentTrack?.id;
-    const currentTrackUri = currentTrack?.uri;
-    const isPaused = state.paused;
-    const position = state.position;
-    const duration = state.duration;
+    const track = state.track_window.current_track;
+    const trackId = track?.id;
 
-    this.currentTrack = currentTrack;
-    this.isPaused = isPaused;
+    // --- 1. INTERCEPTOR DE TRÁFICO (EVITAR GLITCH VISUAL) ---
+    // Si estamos en ambiente, hay cola, y la canción ha cambiado...
+    if (this.modoReproduccion === 'AMBIENTE' && this.colaReproduccion.length > 0 && this.lastTrackId && trackId !== this.lastTrackId) {
+        
+        // a) Guardamos la canción ANTERIOR en el historial (la de ambiente que acaba de terminar)
+        const tiempoSonado = Date.now() - this.songStartTime;
+        if (tiempoSonado > 10000 && this.currentTrack) { // Solo si sonó +10s
+             this.agregarAlHistorialVisual(this.currentTrack, 'AMBIENTE');
+        }
+        
+        // b) Forzamos el pedido inmediatamente
+        this.resumeTrackUri = track?.uri;
+        this.procesarSiguientePedido();
 
-    // --- SINCRONIZACIÓN DE TIEMPO ---
-    this.progressMs = position;
-    this.durationMs = duration;
-    this.progressPercent = (this.progressMs / this.durationMs) * 100;
-    // --------------------------------
-
-    if (currentTrackId !== this.lastTrackId) {
-      this.actualizarInfoMultimedia(currentTrack);
+        // c) ¡IMPORTANTE! Retornamos aquí para NO actualizar la vista con la canción "intrusa"
+        // La interfaz se quedará congelada en la anterior 1 segundo hasta que cargue la buena.
+        return; 
     }
+
+    // --- 2. GESTIÓN NORMAL DE CAMBIO DE CANCIÓN ---
+    if (this.currentTrack && trackId !== this.lastTrackId && this.lastTrackId !== '') {
+        const tiempoSonado = Date.now() - this.songStartTime;
+        // Filtro: Solo al historial si sonó más de 10 segundos
+        if (tiempoSonado > 10000) {
+            this.agregarAlHistorialVisual(this.currentTrack, this.wasPedido ? 'PEDIDO' : 'AMBIENTE');
+        }
+    }
+
+    // Si es una canción nueva, reseteamos el cronómetro y el tipo
+    if (trackId !== this.lastTrackId) {
+        this.songStartTime = Date.now();
+        this.wasPedido = (this.modoReproduccion === 'PEDIDO'); // "Foto" del tipo al inicio
+        this.gramolaService.actualizarMetadataMultimedia(track);
+    }
+
+    // Actualizamos datos de vista
+    this.currentTrack = track;
+    this.isPaused = state.paused;
+    this.durationMs = state.duration;
+    this.progressMs = state.position;
+    this.progressPercent = (this.progressMs / this.durationMs) * 100;
 
     if (this.changingTrack) return;
 
-    if (this.modoReproduccion === 'AMBIENTE') {
-      if (this.lastTrackId && currentTrackId !== this.lastTrackId) {
-        if (this.colaReproduccion.length > 0) {
-          this.resumeTrackUri = currentTrackUri;
-          this.procesarSiguientePedido();
-        } 
-      }
-    }
-
+    // --- 3. GESTIÓN FIN DE PEDIDO ---
     if (this.modoReproduccion === 'PEDIDO') {
-      // Si la canción llega al final (pausada en posición 0)
-      if (isPaused && position === 0 && this.lastTrackId === currentTrackId) {
+      // Si se pausa al principio (0ms) y es la misma canción, es que ha terminado y vuelto al inicio
+      if (this.isPaused && this.progressMs === 0 && this.lastTrackId === trackId) {
         this.finalizarPedidoActual();
         if (this.colaReproduccion.length > 0) {
           this.procesarSiguientePedido();
@@ -229,66 +231,75 @@ export class Gramola implements OnInit, OnDestroy {
       }
     }
 
-    this.lastTrackId = currentTrackId;
+    this.lastTrackId = trackId;
+    this.cdr.detectChanges();
+  }
+
+  agregarAlHistorialVisual(track: any, tipo: 'PEDIDO' | 'AMBIENTE') {
+    if (!track) return;
+    
+    // Evitar duplicados consecutivos exactos
+    if (this.historialVisual.length > 0 && this.historialVisual[0].titulo === track.name) {
+        return; 
+    }
+
+    const nuevoItem = {
+        titulo: track.name,
+        artista: track.artists[0].name,
+        tipo: tipo 
+    };
+    
+    this.historialVisual.unshift(nuevoItem);
+    if (this.historialVisual.length > 5) this.historialVisual.pop();
   }
 
   reproducirAmbiente() {
     if (!this.deviceId || !this.playlistFondo) return;
-    
     this.changingTrack = true;
     this.modoReproduccion = 'AMBIENTE';
     this.cancionSonando = null;
-
     const offset = this.resumeTrackUri ? this.resumeTrackUri : undefined;
 
     this.spotifyService.playContext(this.playlistFondo.uri, this.deviceId, this.usuario.id, offset).subscribe({
-      next: () => {
-        setTimeout(() => {
-            this.changingTrack = false;
-            this.cdr.detectChanges();
-        }, 1000);
-      },
+      next: () => setTimeout(() => { 
+          this.changingTrack = false;
+          this.songStartTime = Date.now(); 
+          this.wasPedido = false;
+          this.cdr.detectChanges(); 
+      }, 1500),
       error: () => this.changingTrack = false
     });
   }
 
   procesarSiguientePedido() {
     if (this.colaReproduccion.length === 0) return;
-
     this.changingTrack = true;
-    const siguienteCancion = this.colaReproduccion[0];
-    
+    const siguiente = this.colaReproduccion[0];
     this.modoReproduccion = 'PEDIDO';
-    this.cancionSonando = siguienteCancion;
+    this.cancionSonando = siguiente;
     
-    this.spotifyService.playTrack(siguienteCancion.spotifyId, this.deviceId, this.usuario.id).subscribe({
+    this.spotifyService.playTrack(siguiente.spotifyId, this.deviceId, this.usuario.id).subscribe({
       next: () => {
-        this.gramolaService.actualizarEstado(Number(siguienteCancion.id), 'SONANDO').subscribe();
+        this.gramolaService.actualizarEstado(Number(siguiente.id), 'SONANDO').subscribe();
         this.colaReproduccion.shift(); 
-        
-        setTimeout(() => {
+        setTimeout(() => { 
             this.changingTrack = false;
-            this.cdr.detectChanges();
+            this.songStartTime = Date.now();
+            this.wasPedido = true;
+            this.cdr.detectChanges(); 
         }, 1500);
       },
-      error: (e) => {
-        console.error("Error reproduciendo pedido", e);
-        this.changingTrack = false;
-        this.reproducirAmbiente();
-      }
+      error: () => { this.changingTrack = false; this.reproducirAmbiente(); }
     });
   }
 
   finalizarPedidoActual() {
     if (this.cancionSonando) {
-      const idTerminado = Number(this.cancionSonando.id);
-      this.gramolaService.actualizarEstado(idTerminado, 'TERMINADA').subscribe({
+      this.gramolaService.actualizarEstado(Number(this.cancionSonando.id), 'TERMINADA').subscribe({
         next: () => {
-          console.log(`Canción ${idTerminado} finalizada en BD.`);
           this.cancionSonando = null;
           this.cargarCola(); 
-        },
-        error: (err) => console.error("Error al marcar como terminada", err)
+        }
       });
     }
   }
@@ -297,6 +308,7 @@ export class Gramola implements OnInit, OnDestroy {
     this.gramolaService.obtenerCola(Number(this.usuario.id)).subscribe({
       next: (res: any) => {
         this.ngZone.run(() => {
+          // Filtramos para no duplicar la que suena
           if (this.cancionSonando) {
             this.colaReproduccion = res.filter((c: any) => c.id !== this.cancionSonando.id);
           } else {
@@ -308,35 +320,27 @@ export class Gramola implements OnInit, OnDestroy {
     });
   }
 
-  // --- NUEVA FUNCIÓN PARA EL HTML ---
   formatTime(ms: number): string {
-    if (!ms) return '0:00';
+    if (!ms) return "0:00";
     const totalSeconds = Math.floor(ms / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
-  // ----------------------------------
 
   search() {
     if (!this.busqueda || this.busqueda.trim().length <= 2) return;
     this.isSearching = true; 
-    this.searchResults = []; 
     
     this.spotifyService.search(this.busqueda, this.usuario.id, 'track').subscribe({
       next: (res: any) => {
         this.ngZone.run(() => {
-          if (res && res.tracks && res.tracks.items) {
-            this.searchResults = res.tracks.items;
-          }
-          this.isSearching = false;
-          this.cdr.detectChanges(); 
+            this.searchResults = res?.tracks?.items || [];
+            this.isSearching = false;
+            this.cdr.detectChanges(); 
         });
       },
-      error: (err) => {
-        this.isSearching = false;
-        this.cdr.detectChanges();
-      }
+      error: () => this.isSearching = false
     });
   }
 
@@ -363,10 +367,7 @@ export class Gramola implements OnInit, OnDestroy {
     if (success) {
       this.busqueda = '';
       this.searchResults = [];
-      this.ngZone.run(() => {
-        this.cargarCola(); 
-        this.cdr.detectChanges();
-      });
+      this.cargarCola();
     }
   }
 
@@ -378,9 +379,8 @@ export class Gramola implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
-    this.player?.disconnect();
+    if (this.player) this.player.disconnect();
     if (this.pollingInterval) clearInterval(this.pollingInterval);
-    // Limpiamos el timer del progreso también
     if (this.progressTimer) clearInterval(this.progressTimer);
     this.titleService.setTitle('Gramola'); 
   }
