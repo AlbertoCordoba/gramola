@@ -4,7 +4,6 @@ import com.gramola.backend.service.GramolaService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
 import java.util.Collections;
 import java.util.Map;
 
@@ -31,7 +30,6 @@ public class GramolaController {
         return ResponseEntity.ok(gramolaService.obtenerCola(barId));
     }
 
-    // NUEVO ENDPOINT HISTORIAL
     @GetMapping("/historial/{barId}")
     public ResponseEntity<?> verHistorial(@PathVariable Long barId) {
         return ResponseEntity.ok(gramolaService.obtenerHistorial(barId));
@@ -42,7 +40,6 @@ public class GramolaController {
         try {
             Long id = Long.valueOf(payload.get("id").toString());
             String estado = (String) payload.get("estado");
-            
             gramolaService.actualizarEstado(id, estado);
             return ResponseEntity.ok(Collections.singletonMap("mensaje", "Estado actualizado"));
         } catch (Exception e) {

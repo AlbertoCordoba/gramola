@@ -98,9 +98,9 @@
         </section>
 
         <section class="history-section">
-          <h3 class="section-title">Recién Sonadas</h3>
+          <h3 class="section-title">Historial Reciente</h3>
           <div class="history-list">
-            <div class="history-card" *ngFor="let item of historialVisual"
+            <div class="history-card" *ngFor="let item of historialVisual" 
                  [class.is-ambiente]="item.tipo === 'AMBIENTE'">
               <div class="h-info">
                 <span class="h-title">{{ item.titulo }}</span>
@@ -109,7 +109,7 @@
               <span class="h-check" *ngIf="item.tipo === 'PEDIDO'">💎</span>
               <span class="h-check" *ngIf="item.tipo === 'AMBIENTE'">📻</span>
             </div>
-            <p *ngIf="historialVisual.length === 0" class="text-muted">Sin historial reciente.</p>
+            <p *ngIf="historialVisual.length === 0" class="text-muted">Historial vacío.</p>
           </div>
         </section>
 

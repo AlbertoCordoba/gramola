@@ -40,12 +40,8 @@ public class GramolaService {
         cancion.setArtista((String) datos.get("artista"));
         cancion.setPreviewUrl((String) datos.get("previewUrl"));
         
-        Object duracionMsObj = datos.get("duracionMs");
-        if (duracionMsObj instanceof Number) {
-            cancion.setDuracionMs(((Number) duracionMsObj).intValue());
-        } else {
-            cancion.setDuracionMs(0);
-        }
+        Object duracionObj = datos.get("duracionMs");
+        cancion.setDuracionMs(duracionObj instanceof Number ? ((Number) duracionObj).intValue() : 0);
         
         cancion.setEstado("COLA");
         cancion = cancionRepository.save(cancion);
@@ -65,7 +61,6 @@ public class GramolaService {
         return cancionRepository.findByBarIdAndEstadoOrderByFechaSolicitudAsc(barId, "COLA");
     }
 
-    // NUEVO: Método para el historial
     public List<CancionSolicitada> obtenerHistorial(Long barId) {
         return cancionRepository.findTop5ByBarIdAndEstadoOrderByFechaSolicitudDesc(barId, "TERMINADA");
     }
