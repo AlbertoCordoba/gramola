@@ -4,8 +4,10 @@ import com.gramola.backend.dto.BarLoginDTO;
 import com.gramola.backend.dto.BarRegistroDTO;
 import com.gramola.backend.model.Bar;
 import com.gramola.backend.model.ConfiguracionPrecios;
+import com.gramola.backend.model.Pagos; // Importar Pagos
 import com.gramola.backend.repository.BarRepository;
 import com.gramola.backend.repository.ConfiguracionPreciosRepository;
+import com.gramola.backend.repository.PagosRepository; // Importar Repositorio
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -28,9 +30,11 @@ public class BarService {
     @Autowired
     private EmailService emailService;
     
-    // INYECCIÓN DEL SERVICIO DE PAGOS
+    // INYECCIÓN DEL SERVICIO DE PAGOS Y REPOSITORIO DE PAGOS
     @Autowired
     private MockPaymentService paymentService;
+    @Autowired
+    private PagosRepository pagosRepository; // Inyectamos esto
 
     public Map<String, BigDecimal> obtenerPrecios() {
         Map<String, BigDecimal> precios = new HashMap<>();
@@ -112,18 +116,33 @@ public class BarService {
         barRepository.save(bar);
     }
 
-    // --- MODIFICADO: ACEPTAR SIMULACIÓN DE ERROR ---
+    // --- MODIFICADO: GUARDAR PAGO EN BASE DE DATOS ---
     public void activarSuscripcion(String email, String tipo, boolean simularError) throws Exception {
         Bar bar = barRepository.findByEmail(email).orElseThrow(() -> new Exception("Usuario no encontrado"));
         
-        // 1. INTENTAMOS COBRAR
+        // 1. INTENTAMOS COBRAR (Simulación Pasarela)
         paymentService.procesarPago(simularError);
 
-        // 2. SI NO FALLA, ACTIVAMOS
+        // 2. OBTENER PRECIO DE LA BD (Para guardarlo en el registro de pagos)
+        BigDecimal precioSuscripcion = preciosRepository.findByClave(tipo)
+                .map(ConfiguracionPrecios::getValor)
+                .orElse(BigDecimal.ZERO); // Si no lo encuentra, 0.00 (o lanzar error)
+
+        // 3. REGISTRAR EL PAGO EN LA TABLA 'pagos'
+        Pagos nuevoPago = new Pagos();
+        nuevoPago.setBarId(bar.getId());
+        nuevoPago.setConcepto("Suscripción: " + tipo);
+        nuevoPago.setMonto(precioSuscripcion);
+        nuevoPago.setFechaPago(LocalDateTime.now());
+        // cancionId se queda en null porque no es un pago de canción
+        pagosRepository.save(nuevoPago);
+
+        // 4. ACTIVAR LA CUENTA Y GUARDAR FECHA FIN
         bar.setTipoSuscripcion(tipo);
         bar.setActivo(true);
         bar.setFechaFinSuscripcion(tipo.equals("SUSCRIPCION_ANUAL") ? 
             java.time.LocalDate.now().plusYears(1) : java.time.LocalDate.now().plusMonths(1));
+        
         barRepository.save(bar);
     }
 }

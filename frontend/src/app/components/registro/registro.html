@@ -1,53 +1,68 @@
 <div class="registro-container">
   <div class="registro-card">
-    <h2>Crear Cuenta</h2>
-    <p>Únete a Gramola Virtual</p>
+    
+    <div *ngIf="!enviado">
+      <h2>Crear Cuenta</h2>
+      <p>Únete a Gramola Virtual</p>
 
-    <form (ngSubmit)="onRegistro()">
-      <div class="form-group">
-        <label>Nombre del Bar</label>
-        <input type="text" [(ngModel)]="registroData.nombre" name="nombre" placeholder="Bar Manolo" required>
-      </div>
-
-      <div class="form-group">
-        <label>Email</label>
-        <input type="email" [(ngModel)]="registroData.email" name="email" placeholder="hola@bar.com" required>
-      </div>
-
-      <div class="form-row">
-        <div class="form-group half">
-          <label>Contraseña</label>
-          <input type="password" [(ngModel)]="registroData.password" name="password" required>
+      <form (ngSubmit)="onRegistro()">
+        <div class="form-group">
+          <label>Nombre del Bar</label>
+          <input type="text" [(ngModel)]="registroData.nombre" name="nombre" placeholder="Bar Manolo" required [disabled]="cargando">
         </div>
-        <div class="form-group half">
-          <label>Repetir</label>
-          <input type="password" [(ngModel)]="registroData.confirmPassword" name="confirmPassword" required>
+
+        <div class="form-group">
+          <label>Email</label>
+          <input type="email" [(ngModel)]="registroData.email" name="email" placeholder="hola@bar.com" required [disabled]="cargando">
         </div>
-      </div>
 
-      <div class="form-group location-box">
-        <label>Ubicación</label>
-        <div class="geo-inputs">
-          <input type="number" [(ngModel)]="registroData.latitud" name="latitud" placeholder="Lat">
-          <input type="number" [(ngModel)]="registroData.longitud" name="longitud" placeholder="Long">
+        <div class="form-row">
+          <div class="form-group half">
+            <label>Contraseña</label>
+            <input type="password" [(ngModel)]="registroData.password" name="password" required [disabled]="cargando">
+          </div>
+          <div class="form-group half">
+            <label>Repetir</label>
+            <input type="password" [(ngModel)]="registroData.confirmPassword" name="confirmPassword" required [disabled]="cargando">
+          </div>
         </div>
-        <button type="button" class="btn-geo" (click)="obtenerUbicacion()">📍 Detectar</button>
+
+        <div class="form-group location-box">
+          <label>Ubicación <span *ngIf="registroData.latitud">(Lat: {{ registroData.latitud | number:'1.3-3' }})</span></label>
+          <button type="button" class="btn-geo" (click)="obtenerUbicacion()" [disabled]="cargando">
+            {{ registroData.latitud ? '📍 Ubicación Detectada' : '📍 Detectar Ubicación' }}
+          </button>
+        </div>
+
+        <div class="form-group canvas-container">
+          <label class="canvas-title">Firma del Propietario</label>
+          <canvas #firmaCanvas width="400" height="150"></canvas>
+          <button type="button" class="btn-clear" (click)="limpiarFirma()" [disabled]="cargando">Borrar Firma</button>
+        </div>
+
+        <div *ngIf="errorMessage" class="msg error">{{ errorMessage }}</div>
+
+        <button type="submit" class="btn-submit" [disabled]="cargando" [class.btn-loading]="cargando">
+          {{ cargando ? 'Registrando...' : 'Registrarse' }}
+        </button>
+      </form>
+
+      <div class="footer-links">
+        <p>¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a></p>
       </div>
-
-      <div *ngIf="errorMessage" class="msg error">{{ errorMessage }}</div>
-      <div *ngIf="successMessage" class="msg success">{{ successMessage }}</div>
-
-      <div class="form-group canvas-container">
-        <label class="canvas-title">Firma del Propietario</label>
-        <canvas #firmaCanvas width="400" height="150"></canvas>
-        <button type="button" class="btn-clear" (click)="limpiarFirma()">Borrar Firma</button>
-      </div>
-
-      <button type="submit" class="btn-submit">Registrarse</button>
-    </form>
-
-    <div class="footer-links">
-      <p>¿Ya tienes cuenta? <a routerLink="/login">Inicia sesión</a></p>
     </div>
+
+    <div *ngIf="enviado" class="success-view fade-in">
+      <div class="icon-rocket">🚀</div>
+      <h2>¡Bienvenido a bordo!</h2>
+      <p>Hemos enviado un correo de confirmación a <br><strong>{{ registroData.email }}</strong>.</p>
+      <p>Por favor, revisa tu bandeja de entrada.</p>
+      
+      <div class="redirect-box">
+        <p>Redirigiendo al login...</p>
+        <div class="loading-bar"></div>
+      </div>
+    </div>
+
   </div>
 </div>

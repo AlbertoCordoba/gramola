@@ -14,7 +14,7 @@ import { BarService } from '../../services/bar';
 export class Registro implements AfterViewInit {
   private barService = inject(BarService);
   private router = inject(Router);
-  private cdr = inject(ChangeDetectorRef); // Inyectamos el detector de cambios
+  private cdr = inject(ChangeDetectorRef);
 
   @ViewChild('firmaCanvas', { static: false }) canvasRef!: ElementRef<HTMLCanvasElement>;
   private cx!: CanvasRenderingContext2D | null;
@@ -31,9 +31,14 @@ export class Registro implements AfterViewInit {
   };
 
   errorMessage: string = '';
-  successMessage: string = '';
+  // Variables para controlar la vista de éxito
+  enviado: boolean = false;
+  cargando: boolean = false;
 
   ngAfterViewInit() {
+    // Es posible que el canvas no exista si 'enviado' es true, así que validamos
+    if (!this.canvasRef) return;
+
     const canvas = this.canvasRef.nativeElement;
     this.cx = canvas.getContext('2d');
     if (!this.cx) return;
@@ -75,11 +80,13 @@ export class Registro implements AfterViewInit {
   }
 
   guardarImagen() {
-    this.registroData.firmaBase64 = this.canvasRef.nativeElement.toDataURL('image/png');
+    if (this.canvasRef && this.canvasRef.nativeElement) {
+      this.registroData.firmaBase64 = this.canvasRef.nativeElement.toDataURL('image/png');
+    }
   }
 
   limpiarFirma() {
-    if (!this.cx) return;
+    if (!this.cx || !this.canvasRef) return;
     const canvas = this.canvasRef.nativeElement;
     this.cx.clearRect(0, 0, canvas.width, canvas.height);
     this.registroData.firmaBase64 = '';
@@ -87,19 +94,16 @@ export class Registro implements AfterViewInit {
 
   obtenerUbicacion() {
     this.errorMessage = '';
-    this.successMessage = '';
-
+    
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition((pos) => {
         this.registroData.latitud = pos.coords.latitude;
         this.registroData.longitud = pos.coords.longitude;
-        this.successMessage = 'Ubicación detectada correctamente.';
-        
-        // FORZAMOS A ANGULAR A ACTUALIZAR LA VISTA
+        // Forzamos actualización de la vista para mostrar las coordenadas
         this.cdr.detectChanges(); 
       }, (err) => {
         this.errorMessage = 'Error obteniendo ubicación. Asegúrate de dar permisos.';
-        this.cdr.detectChanges(); // También en caso de error
+        this.cdr.detectChanges();
       });
     } else {
       this.errorMessage = 'Tu navegador no soporta geolocalización.';
@@ -108,17 +112,33 @@ export class Registro implements AfterViewInit {
 
   onRegistro() {
     this.errorMessage = '';
-    this.successMessage = '';
+    
     if (this.registroData.password !== this.registroData.confirmPassword) {
       this.errorMessage = 'Contraseñas no coinciden.';
       return;
     }
+
+    this.cargando = true; // Bloqueamos el botón y inputs
+
     this.barService.registro(this.registroData).subscribe({
       next: () => {
-        this.successMessage = '¡Cuenta creada! Revisa tu email.';
-        setTimeout(() => this.router.navigate(['/login']), 2500);
+        // 1. ÉXITO: Cambiamos a la vista de confirmación
+        this.enviado = true;
+        this.cargando = false;
+        
+        // Forzamos a Angular a pintar la nueva vista inmediatamente
+        this.cdr.detectChanges();
+
+        // 2. Esperamos 4 segundos y redirigimos
+        setTimeout(() => {
+          this.router.navigate(['/login']);
+        }, 4000);
       },
-      error: (e) => this.errorMessage = e.error?.error || 'Error en registro.'
+      error: (e) => {
+        this.cargando = false;
+        this.errorMessage = e.error?.error || 'Error en registro.';
+        this.cdr.detectChanges();
+      }
     });
   }
 }
