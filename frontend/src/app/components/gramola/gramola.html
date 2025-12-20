@@ -41,7 +41,17 @@
           </div>
           <h2 class="hero-title">{{ currentTrack ? currentTrack.name : 'Iniciando...' }}</h2>
           <p class="hero-artist">{{ currentTrack ? currentTrack.artists[0].name : '' }}</p>
-        </div>
+
+          <div class="progress-container" *ngIf="currentTrack">
+            <div class="time-labels">
+              <span>{{ formatTime(progressMs) }}</span>
+              <span>{{ formatTime(durationMs) }}</span>
+            </div>
+            <div class="progress-bar-bg">
+              <div class="progress-fill" [style.width.%]="progressPercent"></div>
+            </div>
+          </div>
+          </div>
       </section>
 
       <section class="search-section">

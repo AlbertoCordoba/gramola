@@ -52,6 +52,13 @@ export class Gramola implements OnInit, OnDestroy {
   cancionSonando: any = null; 
   resumeTrackUri: string = ''; 
   
+  // --- NUEVAS VARIABLES PARA LA BARRA DE PROGRESO ---
+  progressMs: number = 0;
+  durationMs: number = 0;
+  progressPercent: number = 0;
+  private progressTimer: any; // El cronómetro local
+  // --------------------------------------------------
+
   showPaymentModal: boolean = false;
 
   private pollingInterval: any;
@@ -91,6 +98,19 @@ export class Gramola implements OnInit, OnDestroy {
           this.cargarCola();
         }
       }, 5000);
+
+      // --- TIMER PARA MOVER LA BARRA CADA SEGUNDO ---
+      this.progressTimer = setInterval(() => {
+        if (!this.isPaused && this.currentTrack) {
+          this.progressMs += 1000; // Sumamos 1 segundo localmente
+          
+          // Evitar que pase del 100% visualmente
+          if (this.progressMs > this.durationMs) this.progressMs = this.durationMs;
+          
+          this.progressPercent = (this.progressMs / this.durationMs) * 100;
+          this.cdr.detectChanges(); // Forzar actualización visual
+        }
+      }, 1000);
     }
   }
 
@@ -171,9 +191,16 @@ export class Gramola implements OnInit, OnDestroy {
     const currentTrackUri = currentTrack?.uri;
     const isPaused = state.paused;
     const position = state.position;
+    const duration = state.duration;
 
     this.currentTrack = currentTrack;
     this.isPaused = isPaused;
+
+    // --- SINCRONIZACIÓN DE TIEMPO ---
+    this.progressMs = position;
+    this.durationMs = duration;
+    this.progressPercent = (this.progressMs / this.durationMs) * 100;
+    // --------------------------------
 
     if (currentTrackId !== this.lastTrackId) {
       this.actualizarInfoMultimedia(currentTrack);
@@ -236,7 +263,6 @@ export class Gramola implements OnInit, OnDestroy {
     
     this.spotifyService.playTrack(siguienteCancion.spotifyId, this.deviceId, this.usuario.id).subscribe({
       next: () => {
-        // Marcamos como SONANDO en la BD
         this.gramolaService.actualizarEstado(Number(siguienteCancion.id), 'SONANDO').subscribe();
         this.colaReproduccion.shift(); 
         
@@ -253,10 +279,6 @@ export class Gramola implements OnInit, OnDestroy {
     });
   }
 
-  /**
-   * CORRECCIÓN: Notifica al backend y limpia el estado local una vez confirmado
-   * para que la canción desaparezca de la cola definitivamente.
-   */
   finalizarPedidoActual() {
     if (this.cancionSonando) {
       const idTerminado = Number(this.cancionSonando.id);
@@ -264,7 +286,7 @@ export class Gramola implements OnInit, OnDestroy {
         next: () => {
           console.log(`Canción ${idTerminado} finalizada en BD.`);
           this.cancionSonando = null;
-          this.cargarCola(); // Recarga inmediata para limpiar la UI
+          this.cargarCola(); 
         },
         error: (err) => console.error("Error al marcar como terminada", err)
       });
@@ -275,7 +297,6 @@ export class Gramola implements OnInit, OnDestroy {
     this.gramolaService.obtenerCola(Number(this.usuario.id)).subscribe({
       next: (res: any) => {
         this.ngZone.run(() => {
-          // Filtramos para no mostrar la que ya está sonando (si existe)
           if (this.cancionSonando) {
             this.colaReproduccion = res.filter((c: any) => c.id !== this.cancionSonando.id);
           } else {
@@ -286,6 +307,16 @@ export class Gramola implements OnInit, OnDestroy {
       }
     });
   }
+
+  // --- NUEVA FUNCIÓN PARA EL HTML ---
+  formatTime(ms: number): string {
+    if (!ms) return '0:00';
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+  // ----------------------------------
 
   search() {
     if (!this.busqueda || this.busqueda.trim().length <= 2) return;
@@ -349,6 +380,8 @@ export class Gramola implements OnInit, OnDestroy {
   ngOnDestroy() {
     this.player?.disconnect();
     if (this.pollingInterval) clearInterval(this.pollingInterval);
+    // Limpiamos el timer del progreso también
+    if (this.progressTimer) clearInterval(this.progressTimer);
     this.titleService.setTitle('Gramola'); 
   }
 }

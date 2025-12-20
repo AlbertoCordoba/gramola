@@ -264,6 +264,36 @@
   padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
 }
 
+/* --- ESTILOS DE LA BARRA DE PROGRESO (NUEVO) --- */
+.progress-container {
+  margin-top: 25px;
+  width: 100%;
+}
+
+.time-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--text-sec);
+  font-family: monospace;
+  margin-bottom: 8px;
+}
+
+.progress-bar-bg {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: var(--primary);
+  transition: width 1s linear; /* Suaviza el movimiento del timer */
+  box-shadow: 0 0 10px var(--primary);
+}
+
 /* --- ANIMACIONES --- */
 @keyframes spin { from { transform: translateX(50px) rotate(0deg); } to { transform: translateX(50px) rotate(360deg); } }
 @keyframes blink { 0%, 100% { opacity: 1; box-shadow: 0 0 10px var(--primary); } 50% { opacity: 0.4; box-shadow: none; } }
