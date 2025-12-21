@@ -4,11 +4,12 @@ import com.gramola.backend.dto.BarLoginDTO;
 import com.gramola.backend.dto.BarRegistroDTO;
 import com.gramola.backend.model.Bar;
 import com.gramola.backend.model.ConfiguracionPrecios;
-import com.gramola.backend.model.Pagos; // Importar Pagos
+import com.gramola.backend.model.Pagos;
 import com.gramola.backend.repository.BarRepository;
 import com.gramola.backend.repository.ConfiguracionPreciosRepository;
-import com.gramola.backend.repository.PagosRepository; // Importar Repositorio
+import com.gramola.backend.repository.PagosRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder; // 1. IMPORTAR BCRYPT
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -29,12 +30,14 @@ public class BarService {
     private ConfiguracionPreciosRepository preciosRepository;
     @Autowired
     private EmailService emailService;
-    
-    // INYECCIÓN DEL SERVICIO DE PAGOS Y REPOSITORIO DE PAGOS
     @Autowired
     private MockPaymentService paymentService;
     @Autowired
-    private PagosRepository pagosRepository; // Inyectamos esto
+    private PagosRepository pagosRepository;
+
+    // 2. CREAR INSTANCIA DEL ENCRIPTADOR
+    // BCrypt es el estándar actual: seguro y lento (para evitar ataques de fuerza bruta)
+    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public Map<String, BigDecimal> obtenerPrecios() {
         Map<String, BigDecimal> precios = new HashMap<>();
@@ -53,7 +56,12 @@ public class BarService {
         Bar bar = new Bar();
         bar.setNombre(datos.getNombre());
         bar.setEmail(datos.getEmail());
-        bar.setPassword(datos.getPassword()); 
+        
+        // 3. ENCRIPTAR AL REGISTRAR
+        // Nunca guardamos datos.getPassword() directo. Guardamos el hash.
+        String passwordEncriptada = passwordEncoder.encode(datos.getPassword());
+        bar.setPassword(passwordEncriptada); 
+        
         bar.setLatitud(datos.getLatitud());
         bar.setLongitud(datos.getLongitud());
         
@@ -86,7 +94,12 @@ public class BarService {
         Bar bar = barRepository.findByEmail(datos.getEmail())
                 .orElseThrow(() -> new Exception("Usuario no encontrado"));
 
-        if (!bar.getPassword().equals(datos.getPassword())) throw new Exception("Contraseña incorrecta");
+        // 4. COMPARAR AL HACER LOGIN
+        // No podemos comparar textos planos. Usamos .matches(textoPlano, hashGuardado)
+        if (!passwordEncoder.matches(datos.getPassword(), bar.getPassword())) {
+            throw new Exception("Contraseña incorrecta");
+        }
+
         if (bar.getTokenConfirmacion() != null) throw new Exception("Confirma tu email primero.");
         if (!bar.isActivo()) throw new Exception("Completa el pago de suscripción.");
 
@@ -110,34 +123,30 @@ public class BarService {
                 .orElseThrow(() -> new Exception("Token inválido"));
         if (bar.getResetPasswordExpires().isBefore(LocalDateTime.now())) throw new Exception("Token expirado");
 
-        bar.setPassword(newPassword);
+        // 5. ENCRIPTAR TAMBIÉN AL RESTABLECER
+        bar.setPassword(passwordEncoder.encode(newPassword));
+        
         bar.setResetPasswordToken(null);
         bar.setResetPasswordExpires(null);
         barRepository.save(bar);
     }
 
-    // --- MODIFICADO: GUARDAR PAGO EN BASE DE DATOS ---
     public void activarSuscripcion(String email, String tipo, boolean simularError) throws Exception {
         Bar bar = barRepository.findByEmail(email).orElseThrow(() -> new Exception("Usuario no encontrado"));
         
-        // 1. INTENTAMOS COBRAR (Simulación Pasarela)
         paymentService.procesarPago(simularError);
 
-        // 2. OBTENER PRECIO DE LA BD (Para guardarlo en el registro de pagos)
         BigDecimal precioSuscripcion = preciosRepository.findByClave(tipo)
                 .map(ConfiguracionPrecios::getValor)
-                .orElse(BigDecimal.ZERO); // Si no lo encuentra, 0.00 (o lanzar error)
+                .orElse(BigDecimal.ZERO);
 
-        // 3. REGISTRAR EL PAGO EN LA TABLA 'pagos'
         Pagos nuevoPago = new Pagos();
         nuevoPago.setBarId(bar.getId());
         nuevoPago.setConcepto("Suscripción: " + tipo);
         nuevoPago.setMonto(precioSuscripcion);
         nuevoPago.setFechaPago(LocalDateTime.now());
-        // cancionId se queda en null porque no es un pago de canción
         pagosRepository.save(nuevoPago);
 
-        // 4. ACTIVAR LA CUENTA Y GUARDAR FECHA FIN
         bar.setTipoSuscripcion(tipo);
         bar.setActivo(true);
         bar.setFechaFinSuscripcion(tipo.equals("SUSCRIPCION_ANUAL") ? 
