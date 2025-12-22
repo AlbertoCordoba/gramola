@@ -12,8 +12,8 @@ import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 @Service
@@ -49,10 +49,9 @@ public class SpotifyService {
 
     public String getAccessTokenForBar(Long barId) {
         Bar bar = barRepository.findById(barId).orElseThrow(() -> new RuntimeException("Bar no encontrado"));
-        
+        // Ya no devolvemos MOCK_TOKEN. Si no hay token, debe fallar o pedir login.
         if (bar.getSpotifyRefreshToken() == null) {
-            // Para tests, si no hay token, devolvemos uno falso para no romper el flujo
-            return "MOCK_TOKEN_FOR_TESTING";
+            throw new RuntimeException("El bar no está conectado a Spotify");
         }
 
         if (bar.getSpotifyTokenExpiresAt() == null || LocalDateTime.now().isAfter(bar.getSpotifyTokenExpiresAt())) {
@@ -85,7 +84,7 @@ public class SpotifyService {
             if (resp != null) {
                 String newAccessToken = (String) resp.get("access_token");
                 Integer expiresIn = (Integer) resp.get("expires_in");
-                if (expiresIn == null || expiresIn < 3600) expiresIn = 3600;
+                if (expiresIn == null) expiresIn = 3600;
 
                 Bar bar = barRepository.findById(barId).orElseThrow();
                 bar.setSpotifyAccessToken(newAccessToken);
@@ -97,66 +96,74 @@ public class SpotifyService {
             }
         } catch (Exception e) {
             System.err.println("Error Token Spotify: " + e.getMessage());
+            throw new RuntimeException("Error conectando con Spotify");
         }
     }
 
-    // --- BÚSQUEDA CON FALLBACK PARA TESTS ---
+    // --- BÚSQUEDA REAL ---
     public Object search(String query, String type, Long barId) {
-        try {
-            String token = getAccessTokenForBar(barId);
-            // Si es un token de test, lanzamos excepción para ir al catch directamente
-            if ("MOCK_TOKEN_FOR_TESTING".equals(token)) throw new Exception("Test Mode");
+        // Sin try-catch falso. Si falla, que explote para saberlo.
+        String token = getAccessTokenForBar(barId);
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.setBearerAuth(token);
-            HttpEntity<String> entity = new HttpEntity<>(headers);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
 
-            String url = UriComponentsBuilder.fromUriString("https://api.spotify.com/v1/search") 
-                    .queryParam("q", query)      
-                    .queryParam("type", type) 
-                    .queryParam("limit", 10)
-                    .toUriString();             
+        String url = UriComponentsBuilder.fromUriString("https://api.spotify.com/v1/search") 
+                .queryParam("q", query)      
+                .queryParam("type", type) 
+                .queryParam("limit", 10)
+                .toUriString();             
 
-            ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
-            return response.getBody();
-
-        } catch (Exception e) {
-            System.out.println("⚠️ API Spotify falló o modo test activado. Devolviendo datos simulados.");
-            return getMockSearchResults(); // Devolvemos datos falsos para que el test pase
-        }
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+        return response.getBody();
     }
     
-    private Map<String, Object> getMockSearchResults() {
-        // Estructura JSON simulada de Spotify: { tracks: { items: [ ... ] } }
-        Map<String, Object> mockTrack = new HashMap<>();
-        mockTrack.put("id", "mock-track-id");
-        mockTrack.put("name", "Bohemian Rhapsody (Simulada)");
-        mockTrack.put("duration_ms", 354000);
-        
-        Map<String, Object> artist = new HashMap<>();
-        artist.put("name", "Queen");
-        mockTrack.put("artists", List.of(artist));
-        
-        Map<String, Object> image = new HashMap<>();
-        image.put("url", "https://upload.wikimedia.org/wikipedia/en/9/9f/Bohemian_Rhapsody.png");
-        Map<String, Object> album = new HashMap<>();
-        album.put("images", List.of(image));
-        mockTrack.put("album", album);
-
-        Map<String, Object> tracks = new HashMap<>();
-        tracks.put("items", List.of(mockTrack));
-        
-        Map<String, Object> response = new HashMap<>();
-        response.put("tracks", tracks);
-        return response;
-    }
-    
+    // --- REPRODUCCIÓN REAL ---
     public void playTrack(String trackUri, String deviceId, Long barId) {
-        // En modo test, simplemente no hacemos nada (simulamos que suena)
-        System.out.println("🎵 Reproduciendo (Simulado): " + trackUri);
+        String token = getAccessTokenForBar(barId); // Token real
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("uris", Collections.singletonList(trackUri));
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+        
+        try {
+            String url = "https://api.spotify.com/v1/me/player/play?device_id=" + deviceId;
+            restTemplate.put(url, request);
+            System.out.println("▶️ REAL: Reproduciendo " + trackUri);
+        } catch (Exception e) {
+            System.err.println("❌ Error PlayTrack: " + e.getMessage());
+            // No lanzamos excepción para no romper el flujo si el dispositivo no está listo
+        }
     }
 
     public void playContext(String contextUri, String deviceId, Long barId, String offsetUri) {
-        System.out.println("🎵 Reproduciendo Contexto (Simulado): " + contextUri);
+        String token = getAccessTokenForBar(barId);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("context_uri", contextUri);
+        
+        if (offsetUri != null && !offsetUri.isEmpty()) {
+            body.put("offset", Collections.singletonMap("uri", offsetUri));
+        }
+
+        HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
+
+        try {
+            String url = "https://api.spotify.com/v1/me/player/play?device_id=" + deviceId;
+            restTemplate.put(url, request);
+            System.out.println("▶️ REAL: Reproduciendo Contexto " + contextUri);
+        } catch (Exception e) {
+            System.err.println("❌ Error PlayContext: " + e.getMessage());
+        }
     }
 }
