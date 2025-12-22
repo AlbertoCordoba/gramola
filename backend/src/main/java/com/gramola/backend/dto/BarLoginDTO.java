@@ -6,4 +6,6 @@ import lombok.Data;
 public class BarLoginDTO {
     private String email;
     private String password;
+    private Double lat;
+    private Double lng;
 }

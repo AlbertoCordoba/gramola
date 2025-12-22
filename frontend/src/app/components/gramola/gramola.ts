@@ -57,7 +57,7 @@ export class Gramola implements OnInit, OnDestroy {
   isPaused: boolean = true;
   modoReproduccion: ModoReproduccion = 'AMBIENTE';
   cancionSonando: any = null; 
-  resumeTrackUri: string = ''; // URI para reanudar el ambiente
+  resumeTrackUri: string = ''; 
   
   // Progreso
   progressMs: number = 0;
@@ -71,10 +71,9 @@ export class Gramola implements OnInit, OnDestroy {
   private lastTrackId: string = ''; 
   private changingTrack: boolean = false; 
   
-  // Precio Dinámico
-  precioCancion: number = 0.50; // Valor por defecto
+  // --- CAMBIO: INICIALIZADO A 0 PARA FORZAR CARGA DE BD ---
+  precioCancion: number = 0;
 
-  // Historial y Anti-glitch
   private songStartTime: number = 0;     
   private wasPedido: boolean = false;    
 
@@ -99,7 +98,8 @@ export class Gramola implements OnInit, OnDestroy {
     if (this.usuario) {
       this.initSpotifySDK();
       this.cargarCola(); 
-      this.cargarPrecioCancion(); // Cargar precio al inicio
+      // Cargamos el precio real de la BD al entrar
+      this.cargarPrecioCancion();
       
       this.pollingInterval = setInterval(() => {
         if (!this.changingTrack) {
@@ -121,6 +121,7 @@ export class Gramola implements OnInit, OnDestroy {
   cargarPrecioCancion() {
     this.gramolaService.obtenerConfiguracionPrecios().subscribe({
       next: (precios: any) => {
+        // Asignamos el valor que viene de la BD (si existe)
         if (precios && precios['PRECIO_CANCION']) {
           this.precioCancion = precios['PRECIO_CANCION'];
         }
@@ -183,50 +184,32 @@ export class Gramola implements OnInit, OnDestroy {
 
     const track = state.track_window.current_track;
     const trackId = track?.id;
-
-    // --- LÓGICA DE CAPTURA DE "SIGUIENTE" ---
-    // Si estamos en AMBIENTE, queremos que al volver suene la SIGUIENTE a la actual, no la misma.
     if (this.modoReproduccion === 'AMBIENTE') {
-        // Intentamos capturar la siguiente en la cola de Spotify
         if (state.track_window.next_tracks && state.track_window.next_tracks.length > 0) {
              this.resumeTrackUri = state.track_window.next_tracks[0].uri;
         } else if (track && track.uri) {
-             // Si es la última, nos quedamos con la actual
              this.resumeTrackUri = track.uri;
         }
     }
-
-    // --- INTERCEPTOR (EVITA QUE SUENE LA INTRUSA) ---
-    // Si detectamos que la canción cambió pero hay cola pendiente (Transición Ambiente -> Pedido)
     if (this.modoReproduccion === 'AMBIENTE' && this.colaReproduccion.length > 0 && this.lastTrackId && trackId !== this.lastTrackId) {
         
-        // 1. Guardar la anterior en historial (solo si sonó > 10s)
         const tiempoSonado = Date.now() - this.songStartTime;
-        if (tiempoSonado > 10000 && this.currentTrack) {
+        if (tiempoSonado > 5000 && this.currentTrack) {
              this.agregarAlHistorialVisual(this.currentTrack, 'AMBIENTE');
         }
-        
-        // 2. IMPORTANTE: En este caso "interceptor", la canción "track" es la que acaba de empezar (la intrusa).
-        // Como acaba de empezar, si volvemos a ella, sonará desde el principio. 
-        // Así que aquí sobreescribimos resumeTrackUri con la intrusa para no saltárnosla.
         if (track && track.uri) {
             this.resumeTrackUri = track.uri;
         }
-
-        // 3. Cortamos y ponemos el pedido
         this.procesarSiguientePedido();
         return; 
     }
 
-    // --- HISTORIAL NORMAL ---
     if (this.currentTrack && trackId !== this.lastTrackId && this.lastTrackId !== '') {
         const tiempoSonado = Date.now() - this.songStartTime;
-        if (tiempoSonado > 10000) {
+        if (tiempoSonado > 5000) {
             this.agregarAlHistorialVisual(this.currentTrack, this.wasPedido ? 'PEDIDO' : 'AMBIENTE');
         }
     }
-
-    // Actualización de datos de la canción actual
     if (trackId !== this.lastTrackId) {
         this.songStartTime = Date.now();
         this.wasPedido = (this.modoReproduccion === 'PEDIDO'); 
@@ -240,10 +223,7 @@ export class Gramola implements OnInit, OnDestroy {
     this.progressPercent = (this.progressMs / this.durationMs) * 100;
 
     if (this.changingTrack) return;
-
-    // --- FIN DE PEDIDO ---
     if (this.modoReproduccion === 'PEDIDO') {
-      // Si se pausa al principio (0ms) significa que terminó
       if (this.isPaused && this.progressMs === 0 && this.lastTrackId === trackId) {
         this.finalizarPedidoActual();
         if (this.colaReproduccion.length > 0) {
@@ -278,8 +258,6 @@ export class Gramola implements OnInit, OnDestroy {
     this.changingTrack = true;
     this.modoReproduccion = 'AMBIENTE';
     this.cancionSonando = null;
-
-    // Usamos la URI guardada (que ahora apunta a la SIGUIENTE o a la INTRUSA si hubo corte)
     const offset = (this.resumeTrackUri && this.resumeTrackUri.includes('spotify:track:')) ? this.resumeTrackUri : undefined;
 
     this.spotifyService.playContext(this.playlistFondo.uri, this.deviceId, this.usuario.id, offset).subscribe({
@@ -288,7 +266,6 @@ export class Gramola implements OnInit, OnDestroy {
       },
       error: (err) => {
         console.warn("Fallo al reanudar exacto. Reiniciando playlist...", err);
-        // Fallback
         this.spotifyService.playContext(this.playlistFondo.uri, this.deviceId, this.usuario.id).subscribe({
             next: () => this.resetVariables(),
             error: () => this.changingTrack = false
@@ -387,7 +364,7 @@ export class Gramola implements OnInit, OnDestroy {
     const previewUrl = track.preview_url || track.previewUrl || '';
     this.pagoState.setPago({
       concepto: `Canción: ${track.name}`,
-      precio: this.precioCancion, // Usar precio dinámico
+      precio: this.precioCancion,
       tipo: 'CANCION',
       payload: {
         barId: Number(this.usuario.id),

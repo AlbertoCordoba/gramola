@@ -34,9 +34,6 @@ public class BarService {
     private MockPaymentService paymentService;
     @Autowired
     private PagosRepository pagosRepository;
-
-    // 2. CREAR INSTANCIA DEL ENCRIPTADOR
-    // BCrypt es el estándar actual: seguro y lento (para evitar ataques de fuerza bruta)
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public Map<String, BigDecimal> obtenerPrecios() {
@@ -57,8 +54,6 @@ public class BarService {
         bar.setNombre(datos.getNombre());
         bar.setEmail(datos.getEmail());
         
-        // 3. ENCRIPTAR AL REGISTRAR
-        // Nunca guardamos datos.getPassword() directo. Guardamos el hash.
         String passwordEncriptada = passwordEncoder.encode(datos.getPassword());
         bar.setPassword(passwordEncriptada); 
         
@@ -91,19 +86,37 @@ public class BarService {
     }
 
     public Bar login(BarLoginDTO datos) throws Exception {
-        Bar bar = barRepository.findByEmail(datos.getEmail())
-                .orElseThrow(() -> new Exception("Usuario no encontrado"));
+            Bar bar = barRepository.findByEmail(datos.getEmail())
+                    .orElseThrow(() -> new Exception("Usuario no encontrado"));
 
-        // 4. COMPARAR AL HACER LOGIN
-        // No podemos comparar textos planos. Usamos .matches(textoPlano, hashGuardado)
-        if (!passwordEncoder.matches(datos.getPassword(), bar.getPassword())) {
-            throw new Exception("Contraseña incorrecta");
+            if (!passwordEncoder.matches(datos.getPassword(), bar.getPassword())) {
+                throw new Exception("Contraseña incorrecta");
+            }
+            if (bar.getTokenConfirmacion() != null) throw new Exception("Confirma tu email primero.");
+            if (!bar.isActivo()) throw new Exception("Completa el pago de suscripción.");
+            if (datos.getLat() == null || datos.getLng() == null) {
+                throw new Exception("⚠️ Ubicación obligatoria. Activa el GPS para entrar.");
+            }
+            if (bar.getLatitud() != null && bar.getLongitud() != null) {
+                double distancia = calcularDistancia(datos.getLat(), datos.getLng(), bar.getLatitud(), bar.getLongitud());
+                
+                if (distancia > 100) {
+                    throw new Exception("⛔ Acceso denegado: Estás a " + (int)distancia + "m del bar (Máx 100m).");
+                }
+            }
+
+            return bar;
         }
 
-        if (bar.getTokenConfirmacion() != null) throw new Exception("Confirma tu email primero.");
-        if (!bar.isActivo()) throw new Exception("Completa el pago de suscripción.");
-
-        return bar;
+    private double calcularDistancia(double lat1, double lon1, double lat2, double lon2) {
+        final int R = 6371; 
+        double latDistance = Math.toRadians(lat2 - lat1);
+        double lonDistance = Math.toRadians(lon2 - lon1);
+        double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
+                + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
+                * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return (R * c) * 1000; 
     }
 
     public void solicitarRecuperacion(String email) throws Exception {
@@ -122,8 +135,6 @@ public class BarService {
         Bar bar = barRepository.findByResetPasswordToken(token)
                 .orElseThrow(() -> new Exception("Token inválido"));
         if (bar.getResetPasswordExpires().isBefore(LocalDateTime.now())) throw new Exception("Token expirado");
-
-        // 5. ENCRIPTAR TAMBIÉN AL RESTABLECER
         bar.setPassword(passwordEncoder.encode(newPassword));
         
         bar.setResetPasswordToken(null);
