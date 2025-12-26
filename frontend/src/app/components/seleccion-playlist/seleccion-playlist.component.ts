@@ -12,12 +12,9 @@ import { SpotifyConnectService } from '../../services/spotify.service';
   styleUrls: ['./seleccion-playlist.component.css']
 })
 export class SeleccionPlaylistComponent implements OnInit {
-  // Inyecciones de servicios
   private spotifyService = inject(SpotifyConnectService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
-  
-  // Servicios para forzar la actualización de la vista
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
 
@@ -26,10 +23,9 @@ export class SeleccionPlaylistComponent implements OnInit {
   
   busqueda: string = '';
   resultados: any[] = [];
-  cargando: boolean = false; // Nuevo: para mostrar feedback visual si quieres
+  cargando: boolean = false;
 
   ngOnInit() {
-    // 1. Cargar usuario del almacenamiento local
     const userJson = localStorage.getItem('usuarioBar');
     if (userJson) {
       this.usuario = JSON.parse(userJson);
@@ -38,12 +34,9 @@ export class SeleccionPlaylistComponent implements OnInit {
       return;
     }
 
-    // 2. Verificar si volvemos de la autenticación de Spotify
     const params = this.route.snapshot.queryParams;
     if (params['status'] === 'success') {
-      console.log("¡Conexión exitosa detectada!");
       this.spotifyConnected = true;
-      // Limpiamos la URL para que quede limpia
       this.router.navigate([], { replaceUrl: true, queryParams: {} });
     } else {
       this.checkConexion();
@@ -58,7 +51,6 @@ export class SeleccionPlaylistComponent implements OnInit {
         }
       },
       error: () => {
-        console.warn('No hay token válido, se requiere conexión.');
         this.spotifyConnected = false;
       }
     });
@@ -70,23 +62,17 @@ export class SeleccionPlaylistComponent implements OnInit {
     });
   }
 
-  // --- SOLUCIÓN AL PROBLEMA DEL BUSCADOR ---
   buscar() {
     if (!this.busqueda || this.busqueda.trim().length === 0) return;
     
     this.cargando = true;
-    this.resultados = []; // Limpiamos la lista visualmente para que se note la nueva búsqueda
+    this.resultados = [];
 
     this.spotifyService.search(this.busqueda, this.usuario.id, 'playlist').subscribe({
       next: (res: any) => {
-        // NgZone.run asegura que Angular sepa que esto ha ocurrido dentro de su "zona"
         this.ngZone.run(() => {
-          console.log("Resultados recibidos del backend:", res); // Debug
-          
           this.resultados = res.playlists?.items || [];
           this.cargando = false;
-          
-          // detectChanges() fuerza a Angular a repintar el HTML inmediatamente
           this.cdr.detectChanges();
         });
       },
@@ -101,13 +87,20 @@ export class SeleccionPlaylistComponent implements OnInit {
   }
 
   seleccionar(playlist: any) {
+    // 1. Guardamos la nueva playlist
     localStorage.setItem('playlistFondo', JSON.stringify(playlist));
+    
+    // 2. CRÍTICO: Borramos el rastro de la canción anterior para evitar conflictos
+    // Así la Gramola sabe que debe empezar la nueva lista desde el principio.
+    localStorage.removeItem('lastTrackUri'); 
+    
     this.router.navigate(['/gramola']);
   }
 
   logout() {
     localStorage.removeItem('usuarioBar');
     localStorage.removeItem('playlistFondo');
+    localStorage.removeItem('lastTrackUri');
     this.router.navigate(['/login']);
   }
 }

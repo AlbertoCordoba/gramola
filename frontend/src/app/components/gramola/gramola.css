@@ -332,6 +332,25 @@
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
+/* --- OVERLAY DE AUTOPLAY (SOLUCIÓN F5) --- */
+.autoplay-overlay {
+  position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.8); z-index: 9999;
+  display: flex; justify-content: center; align-items: center;
+}
+.overlay-content {
+  text-align: center; padding: 40px; border-radius: 20px;
+  background: #181818; border: 1px solid var(--primary);
+  max-width: 400px;
+}
+.icon-sound { font-size: 3rem; margin-bottom: 15px; }
+.btn-activate {
+  background: var(--primary); color: #000; padding: 15px 30px;
+  border: none; border-radius: 30px; font-weight: 800;
+  font-size: 1.1rem; cursor: pointer; margin-top: 20px;
+}
+.btn-activate:hover { transform: scale(1.05); background: #1fdf64; }
+
 /* Responsive */
 @media (max-width: 850px) {
   .lists-layout { grid-template-columns: 1fr; }

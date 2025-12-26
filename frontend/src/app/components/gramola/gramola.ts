@@ -71,7 +71,10 @@ export class Gramola implements OnInit, OnDestroy {
   private lastTrackId: string = ''; 
   private changingTrack: boolean = false; 
   
-  // --- CAMBIO: INICIALIZADO A 0 PARA FORZAR CARGA DE BD ---
+  // Control de bloqueo por Autoplay
+  necesitaInteraccion: boolean = false;
+  
+  // Precio (se carga de BD)
   precioCancion: number = 0;
 
   private songStartTime: number = 0;     
@@ -84,6 +87,13 @@ export class Gramola implements OnInit, OnDestroy {
     } else {
       this.router.navigate(['/login']);
     }
+
+    // FIX F5: Guardar SIEMPRE la canción actual
+    window.addEventListener('beforeunload', () => {
+        if (this.currentTrack && this.currentTrack.uri) {
+            localStorage.setItem('lastTrackUri', this.currentTrack.uri);
+        }
+    });
   }
 
   ngOnInit() {
@@ -98,7 +108,6 @@ export class Gramola implements OnInit, OnDestroy {
     if (this.usuario) {
       this.initSpotifySDK();
       this.cargarCola(); 
-      // Cargamos el precio real de la BD al entrar
       this.cargarPrecioCancion();
       
       this.pollingInterval = setInterval(() => {
@@ -121,7 +130,6 @@ export class Gramola implements OnInit, OnDestroy {
   cargarPrecioCancion() {
     this.gramolaService.obtenerConfiguracionPrecios().subscribe({
       next: (precios: any) => {
-        // Asignamos el valor que viene de la BD (si existe)
         if (precios && precios['PRECIO_CANCION']) {
           this.precioCancion = precios['PRECIO_CANCION'];
         }
@@ -166,7 +174,8 @@ export class Gramola implements OnInit, OnDestroy {
       this.ngZone.run(() => {
         console.log('Player ID:', device_id);
         this.deviceId = device_id;
-        this.reproducirAmbiente();
+        // --- AQUÍ ES DONDE SÍ QUEREMOS VERIFICAR AUTOPLAY (INICIO DE APP) ---
+        this.reproducirAmbiente(true); 
       });
     });
 
@@ -176,6 +185,10 @@ export class Gramola implements OnInit, OnDestroy {
       });
     });
 
+    this.player.addListener('initialization_error', ({ message }: any) => console.error(message));
+    this.player.addListener('authentication_error', ({ message }: any) => console.error(message));
+    this.player.addListener('account_error', ({ message }: any) => console.error(message));
+
     this.player.connect();
   }
 
@@ -184,15 +197,28 @@ export class Gramola implements OnInit, OnDestroy {
 
     const track = state.track_window.current_track;
     const trackId = track?.id;
-    if (this.modoReproduccion === 'AMBIENTE') {
-        if (state.track_window.next_tracks && state.track_window.next_tracks.length > 0) {
-             this.resumeTrackUri = state.track_window.next_tracks[0].uri;
-        } else if (track && track.uri) {
-             this.resumeTrackUri = track.uri;
+
+    // DETECTAR SALTO MANUAL EN MODO PEDIDO
+    if (this.lastTrackId && trackId !== this.lastTrackId && this.modoReproduccion === 'PEDIDO' && !this.changingTrack) {
+        console.warn("⚠️ Salto de canción manual detectado. Finalizando pedido actual...");
+        this.finalizarPedidoActual(); 
+        
+        if (this.colaReproduccion.length > 0) {
+             this.procesarSiguientePedido();
+        } else {
+             this.modoReproduccion = 'AMBIENTE';
+             if (track.uri && !track.uri.includes('spotify:track')) {
+                 this.reproducirAmbiente(); // Aquí NO verificamos autoplay (ya estamos sonando)
+             }
         }
     }
+
+    // FIX SALTO DE CANCIÓN
+    if (this.modoReproduccion === 'AMBIENTE' && track && track.uri) {
+         this.resumeTrackUri = track.uri;
+    }
+
     if (this.modoReproduccion === 'AMBIENTE' && this.colaReproduccion.length > 0 && this.lastTrackId && trackId !== this.lastTrackId) {
-        
         const tiempoSonado = Date.now() - this.songStartTime;
         if (tiempoSonado > 5000 && this.currentTrack) {
              this.agregarAlHistorialVisual(this.currentTrack, 'AMBIENTE');
@@ -210,6 +236,7 @@ export class Gramola implements OnInit, OnDestroy {
             this.agregarAlHistorialVisual(this.currentTrack, this.wasPedido ? 'PEDIDO' : 'AMBIENTE');
         }
     }
+    
     if (trackId !== this.lastTrackId) {
         this.songStartTime = Date.now();
         this.wasPedido = (this.modoReproduccion === 'PEDIDO'); 
@@ -222,14 +249,13 @@ export class Gramola implements OnInit, OnDestroy {
     this.progressMs = state.position;
     this.progressPercent = (this.progressMs / this.durationMs) * 100;
 
-    if (this.changingTrack) return;
-    if (this.modoReproduccion === 'PEDIDO') {
+    if (!this.changingTrack && this.modoReproduccion === 'PEDIDO') {
       if (this.isPaused && this.progressMs === 0 && this.lastTrackId === trackId) {
         this.finalizarPedidoActual();
         if (this.colaReproduccion.length > 0) {
           this.procesarSiguientePedido();
         } else {
-          this.reproducirAmbiente();
+          this.reproducirAmbiente(); // Aquí NO verificamos autoplay
         }
       }
     }
@@ -252,26 +278,61 @@ export class Gramola implements OnInit, OnDestroy {
     if (this.historialVisual.length > 5) this.historialVisual.pop();
   }
 
-  reproducirAmbiente() {
+  // --- MODIFICADO: Acepta parámetro para saber si debe chequear Autoplay ---
+  reproducirAmbiente(verificarAutoplay: boolean = false) {
     if (!this.deviceId || !this.playlistFondo) return;
     
     this.changingTrack = true;
     this.modoReproduccion = 'AMBIENTE';
     this.cancionSonando = null;
-    const offset = (this.resumeTrackUri && this.resumeTrackUri.includes('spotify:track:')) ? this.resumeTrackUri : undefined;
+    
+    let offset: string | undefined = this.resumeTrackUri || localStorage.getItem('lastTrackUri') || undefined;
+    
+    if (offset && !offset.includes('spotify:track:')) {
+        offset = undefined;
+    }
 
     this.spotifyService.playContext(this.playlistFondo.uri, this.deviceId, this.usuario.id, offset).subscribe({
       next: () => {
-        this.resetVariables();
+        // Solo verificamos autoplay si nos lo piden (arranque de app)
+        if (verificarAutoplay) {
+            setTimeout(() => {
+                this.player.getCurrentState().then((state: any) => {
+                    if (!state || state.paused) {
+                        console.warn("⚠️ Autoplay bloqueado. Mostrando botón.");
+                        this.ngZone.run(() => {
+                            this.necesitaInteraccion = true;
+                            this.changingTrack = false;
+                            this.cdr.detectChanges();
+                        });
+                    } else {
+                        this.necesitaInteraccion = false;
+                        this.resetVariables();
+                    }
+                });
+            }, 1500); // Damos 1.5s para que Spotify reaccione
+        } else {
+            // Flujo normal (vuelta de pedido), no bloqueamos nada
+            this.necesitaInteraccion = false;
+            this.resetVariables();
+        }
       },
       error: (err) => {
-        console.warn("Fallo al reanudar exacto. Reiniciando playlist...", err);
-        this.spotifyService.playContext(this.playlistFondo.uri, this.deviceId, this.usuario.id).subscribe({
-            next: () => this.resetVariables(),
-            error: () => this.changingTrack = false
-        });
+        console.warn("Fallo play:", err);
+        // Si falla en el arranque, asumimos bloqueo. Si no, solo log.
+        if (verificarAutoplay) {
+            this.necesitaInteraccion = true;
+        }
+        this.changingTrack = false;
+        this.cdr.detectChanges();
       }
     });
+  }
+
+  activarSonidoManual() {
+    this.necesitaInteraccion = false;
+    // Al activar manualmente, ya no necesitamos verificar autoplay
+    this.reproducirAmbiente(false);
   }
 
   private resetVariables() {
@@ -279,6 +340,7 @@ export class Gramola implements OnInit, OnDestroy {
         this.changingTrack = false;
         this.songStartTime = Date.now(); 
         this.wasPedido = false;
+        localStorage.removeItem('lastTrackUri'); 
         this.cdr.detectChanges(); 
     }, 1500);
   }
@@ -295,6 +357,7 @@ export class Gramola implements OnInit, OnDestroy {
       next: () => {
         this.gramolaService.actualizarEstado(Number(siguiente.id), 'SONANDO').subscribe();
         this.colaReproduccion.shift(); 
+        this.necesitaInteraccion = false;
         
         setTimeout(() => {
             this.changingTrack = false;
@@ -304,8 +367,9 @@ export class Gramola implements OnInit, OnDestroy {
         }, 1500);
       },
       error: (e) => {
+        console.error("Error al poner pedido:", e);
         this.changingTrack = false;
-        this.reproducirAmbiente();
+        this.reproducirAmbiente(); // Sin verificar autoplay
       }
     });
   }
@@ -390,6 +454,7 @@ export class Gramola implements OnInit, OnDestroy {
   logout() {
     localStorage.removeItem('usuarioBar');
     localStorage.removeItem('playlistFondo');
+    localStorage.removeItem('lastTrackUri');
     this.player?.disconnect();
     this.router.navigate(['/login']);
   }
