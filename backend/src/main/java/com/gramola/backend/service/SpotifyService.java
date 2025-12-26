@@ -49,7 +49,7 @@ public class SpotifyService {
 
     public String getAccessTokenForBar(Long barId) {
         Bar bar = barRepository.findById(barId).orElseThrow(() -> new RuntimeException("Bar no encontrado"));
-        // Ya no devolvemos MOCK_TOKEN. Si no hay token, debe fallar o pedir login.
+        
         if (bar.getSpotifyRefreshToken() == null) {
             throw new RuntimeException("El bar no está conectado a Spotify");
         }
@@ -100,9 +100,8 @@ public class SpotifyService {
         }
     }
 
-    // --- BÚSQUEDA REAL ---
+    // --- BÚSQUEDA ---
     public Object search(String query, String type, Long barId) {
-        // Sin try-catch falso. Si falla, que explote para saberlo.
         String token = getAccessTokenForBar(barId);
 
         HttpHeaders headers = new HttpHeaders();
@@ -118,10 +117,26 @@ public class SpotifyService {
         ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
         return response.getBody();
     }
+
+    // --- NUEVO: OBTENER PLAYLIST POR ID ---
+    public Object getPlaylist(String playlistId, Long barId) {
+        String token = getAccessTokenForBar(barId);
+        
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        String url = "https://api.spotify.com/v1/playlists/" + playlistId;
+
+        ResponseEntity<Map> response = restTemplate.exchange(url, HttpMethod.GET, entity, Map.class);
+        return response.getBody();
+    }
     
-    // --- REPRODUCCIÓN REAL ---
+    // --- REPRODUCCIÓN (SIN TRY-CATCH) ---
+    // IMPORTANTE: Hemos quitado el try-catch para que si falla, el Controller se entere
+    // y devuelva un error al Frontend.
     public void playTrack(String trackUri, String deviceId, Long barId) {
-        String token = getAccessTokenForBar(barId); // Token real
+        String token = getAccessTokenForBar(barId);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(token);
@@ -132,14 +147,9 @@ public class SpotifyService {
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
         
-        try {
-            String url = "https://api.spotify.com/v1/me/player/play?device_id=" + deviceId;
-            restTemplate.put(url, request);
-            System.out.println("▶️ REAL: Reproduciendo " + trackUri);
-        } catch (Exception e) {
-            System.err.println("❌ Error PlayTrack: " + e.getMessage());
-            // No lanzamos excepción para no romper el flujo si el dispositivo no está listo
-        }
+        String url = "https://api.spotify.com/v1/me/player/play?device_id=" + deviceId;
+        restTemplate.put(url, request);
+        System.out.println("▶️ REAL: Reproduciendo " + trackUri);
     }
 
     public void playContext(String contextUri, String deviceId, Long barId, String offsetUri) {
@@ -158,12 +168,8 @@ public class SpotifyService {
 
         HttpEntity<Map<String, Object>> request = new HttpEntity<>(body, headers);
 
-        try {
-            String url = "https://api.spotify.com/v1/me/player/play?device_id=" + deviceId;
-            restTemplate.put(url, request);
-            System.out.println("▶️ REAL: Reproduciendo Contexto " + contextUri);
-        } catch (Exception e) {
-            System.err.println("❌ Error PlayContext: " + e.getMessage());
-        }
+        String url = "https://api.spotify.com/v1/me/player/play?device_id=" + deviceId;
+        restTemplate.put(url, request);
+        System.out.println("▶️ REAL: Reproduciendo Contexto " + contextUri);
     }
 }

@@ -63,6 +63,7 @@ export class Gramola implements OnInit, OnDestroy {
   showPaymentModal: boolean = false;
   private pollingInterval: any;
   private lastTrackId: string = ''; 
+  
   private changingTrack: boolean = false; 
   
   necesitaInteraccion: boolean = false;
@@ -79,14 +80,19 @@ export class Gramola implements OnInit, OnDestroy {
       this.router.navigate(['/login']);
     }
 
-    // --- FIX F5 ---
+    // FIX F5: Guardado seguro al cerrar
     window.addEventListener('beforeunload', () => {
-        if (this.currentTrack && this.currentTrack.uri) {
-            localStorage.setItem('lastTrackUri', this.currentTrack.uri);
-            localStorage.setItem('lastModo', this.modoReproduccion);
+        if (this.currentTrack) {
+            // Usamos la misma lógica de "URI segura" que en el cambio de estado
+            const uriSegura = this.currentTrack.linked_from?.uri || this.currentTrack.uri;
             
-            if (this.modoReproduccion === 'PEDIDO' && this.cancionSonando) {
-                localStorage.setItem('pedidoPendiente', JSON.stringify(this.cancionSonando));
+            if (uriSegura && !this.changingTrack) {
+                localStorage.setItem('lastTrackUri', uriSegura);
+                localStorage.setItem('lastModo', this.modoReproduccion);
+                
+                if (this.modoReproduccion === 'PEDIDO' && this.cancionSonando) {
+                    localStorage.setItem('pedidoPendiente', JSON.stringify(this.cancionSonando));
+                }
             }
         }
     });
@@ -99,6 +105,18 @@ export class Gramola implements OnInit, OnDestroy {
     } else {
         this.router.navigate(['/config-audio']);
         return;
+    }
+
+    // Recuperación preventiva
+    const lastModo = localStorage.getItem('lastModo');
+    if (lastModo === 'PEDIDO') {
+        this.modoReproduccion = 'PEDIDO';
+        this.changingTrack = true; 
+    }
+
+    const savedAmbient = localStorage.getItem('ambientResumeUri');
+    if (savedAmbient) {
+        this.resumeTrackUri = savedAmbient;
     }
 
     if (this.usuario) {
@@ -170,8 +188,6 @@ export class Gramola implements OnInit, OnDestroy {
       this.ngZone.run(() => {
         console.log('Player ID Ready:', device_id);
         this.deviceId = device_id;
-        
-        // Esperamos 1s para asegurar que el dispositivo está registrado en la nube de Spotify
         setTimeout(() => {
             this.restaurarEstado();
         }, 1000); 
@@ -197,26 +213,25 @@ export class Gramola implements OnInit, OnDestroy {
 
     if (lastModo === 'PEDIDO' && pedidoJson) {
         try {
-            this.changingTrack = true; // Bloqueamos detección de fin
-            
+            this.changingTrack = true;
             const pedidoGuardado = JSON.parse(pedidoJson);
             this.modoReproduccion = 'PEDIDO';
             this.cancionSonando = pedidoGuardado;
 
             console.log("Restaurando pedido:", pedidoGuardado.titulo);
 
-            // Reintento automático si falla la primera vez
             this.spotifyService.playTrack(pedidoGuardado.spotifyId, this.deviceId, this.usuario.id).subscribe({
                 next: () => this.verificarAutoplay(),
                 error: (err) => {
-                    console.warn("Fallo inicial restaurando pedido, reintentando...", err);
+                    console.warn("Fallo inicial restaurando, reintentando...", err);
                     setTimeout(() => {
                         this.spotifyService.playTrack(pedidoGuardado.spotifyId, this.deviceId, this.usuario.id).subscribe({
                             next: () => this.verificarAutoplay(),
                             error: () => {
-                                console.error("Imposible restaurar. Pasando a ambiente.");
+                                console.error("Imposible restaurar pedido. Pidiendo interacción manual.");
                                 this.changingTrack = false;
-                                this.reproducirAmbiente(true);
+                                this.necesitaInteraccion = true;
+                                this.cdr.detectChanges();
                             }
                         });
                     }, 2000);
@@ -224,11 +239,12 @@ export class Gramola implements OnInit, OnDestroy {
             });
 
         } catch (e) {
-            console.error("Error leyendo datos del pedido", e);
+            console.error("Error recuperando pedido", e);
             this.changingTrack = false;
             this.reproducirAmbiente(true);
         }
     } else {
+        this.changingTrack = false;
         this.reproducirAmbiente(true); 
     }
   }
@@ -237,7 +253,7 @@ export class Gramola implements OnInit, OnDestroy {
     setTimeout(() => {
         this.player.getCurrentState().then((state: any) => {
             if (!state || state.paused) {
-                console.warn("⚠️ Autoplay bloqueado. Esperando usuario.");
+                console.warn("⚠️ Autoplay bloqueado.");
                 this.ngZone.run(() => {
                     this.necesitaInteraccion = true;
                     this.changingTrack = false;
@@ -255,19 +271,32 @@ export class Gramola implements OnInit, OnDestroy {
     if (!state) return;
 
     const track = state.track_window.current_track;
-    const trackId = track?.id;
+    if (!track) return;
 
-    // --- AQUÍ ESTÁ EL CAMBIO CLAVE PARA TU PROBLEMA ---
-    // Si estamos en ambiente, GUARDAMOS la canción actual en LocalStorage
-    // para que sobreviva a un F5
-    if (this.modoReproduccion === 'AMBIENTE' && track && track.uri) {
-         this.resumeTrackUri = track.uri;
-         localStorage.setItem('ambientResumeUri', track.uri); // <--- GUARDADO PERSISTENTE
+    // --- CORRECCIÓN: Obtener URI original (linked_from) ---
+    // Esto es crucial: si Spotify está tocando una versión "linkeada", 
+    // la URI normal no servirá para el offset. Necesitamos la original.
+    const currentUri = track.linked_from?.uri || track.uri;
+    const trackId = track.linked_from?.id || track.id;
+    const context = state.context;
+
+    // --- COMPARACIÓN DE PLAYLIST ROBUSTA ---
+    // Verificamos si la URI de la playlist está contenida en el contexto actual
+    // (Ej: "spotify:playlist:123" está en "spotify:user:juan:playlist:123")
+    const esMismaPlaylist = context && this.playlistFondo && 
+                            context.uri && this.playlistFondo.uri &&
+                            (context.uri === this.playlistFondo.uri || 
+                             context.uri.includes(this.playlistFondo.id));
+
+    if (this.modoReproduccion === 'AMBIENTE' && !this.changingTrack && currentUri) {
+         if (esMismaPlaylist) {
+             this.resumeTrackUri = currentUri;
+             localStorage.setItem('ambientResumeUri', currentUri);
+         }
     }
 
-    // SALTO MANUAL
+    // DETECCIÓN DE SALTO
     if (this.lastTrackId && trackId !== this.lastTrackId && this.modoReproduccion === 'PEDIDO' && !this.changingTrack) {
-        console.warn("⚠️ Salto de canción detectado.");
         this.finalizarPedidoActual(); 
         
         if (this.colaReproduccion.length > 0) {
@@ -275,7 +304,10 @@ export class Gramola implements OnInit, OnDestroy {
         } else {
              this.modoReproduccion = 'AMBIENTE';
              localStorage.removeItem('pedidoPendiente');
-             if (track.uri && !track.uri.includes('spotify:track')) {
+             
+             // Si lo que suena NO es de pago (es decir, ya saltó solo al ambiente o radio),
+             // intentamos forzar nuestra playlist.
+             if (currentUri && !currentUri.includes('spotify:track')) {
                  this.reproducirAmbiente(); 
              }
         }
@@ -286,9 +318,10 @@ export class Gramola implements OnInit, OnDestroy {
         if (tiempoSonado > 5000 && this.currentTrack) {
              this.agregarAlHistorialVisual(this.currentTrack, 'AMBIENTE');
         }
-        if (track && track.uri) {
-            this.resumeTrackUri = track.uri;
-            localStorage.setItem('ambientResumeUri', track.uri); // Actualizamos también aquí
+        
+        if (currentUri && !this.changingTrack && esMismaPlaylist) {
+            this.resumeTrackUri = currentUri;
+            localStorage.setItem('ambientResumeUri', currentUri);
         }
         this.procesarSiguientePedido();
         return; 
@@ -313,7 +346,6 @@ export class Gramola implements OnInit, OnDestroy {
     this.progressMs = state.position;
     this.progressPercent = (this.progressMs / this.durationMs) * 100;
 
-    // FIN DE CANCIÓN
     if (!this.changingTrack && this.modoReproduccion === 'PEDIDO') {
       if (this.isPaused && this.progressMs === 0 && this.lastTrackId === trackId) {
         this.finalizarPedidoActual();
@@ -354,16 +386,13 @@ export class Gramola implements OnInit, OnDestroy {
 
     let offset: string | undefined = undefined;
 
-    // 1. Intentamos usar la variable en memoria
     if (this.resumeTrackUri) {
         offset = this.resumeTrackUri;
     } else {
-        // 2. Si no hay memoria (F5), buscamos la variable PERSISTENTE de ambiente
         const savedAmbient = localStorage.getItem('ambientResumeUri');
         if (savedAmbient) {
             offset = savedAmbient;
         } else {
-             // 3. Último recurso: lo que guardó el beforeunload (solo si era ambiente)
              const storedUri = localStorage.getItem('lastTrackUri');
              const storedModo = localStorage.getItem('lastModo');
              if (storedUri && storedModo === 'AMBIENTE') {
@@ -376,6 +405,8 @@ export class Gramola implements OnInit, OnDestroy {
         offset = undefined;
     }
 
+    console.log("Reproduciendo ambiente. Offset:", offset || "INICIO");
+
     this.spotifyService.playContext(this.playlistFondo.uri, this.deviceId, this.usuario.id, offset).subscribe({
       next: () => {
         if (chequearAutoplay) {
@@ -386,10 +417,27 @@ export class Gramola implements OnInit, OnDestroy {
         }
       },
       error: (err) => {
-        console.warn("Fallo play ambiente:", err);
-        if (chequearAutoplay) this.necesitaInteraccion = true;
-        this.changingTrack = false;
-        this.cdr.detectChanges();
+        console.warn("Fallo play ambiente con offset:", err);
+        
+        if (offset) {
+             console.log("Fallo offset ambiente. Reiniciando lista...");
+             // Limpiamos la memoria corrupta
+             localStorage.removeItem('ambientResumeUri'); 
+             this.resumeTrackUri = '';
+
+             this.spotifyService.playContext(this.playlistFondo.uri, this.deviceId, this.usuario.id, undefined).subscribe({
+                 next: () => this.resetVariables(),
+                 error: () => {
+                     this.necesitaInteraccion = true;
+                     this.changingTrack = false;
+                     this.cdr.detectChanges();
+                 }
+             });
+        } else {
+            this.necesitaInteraccion = true;
+            this.changingTrack = false;
+            this.cdr.detectChanges();
+        }
       }
     });
   }
@@ -531,7 +579,7 @@ export class Gramola implements OnInit, OnDestroy {
     localStorage.removeItem('lastTrackUri');
     localStorage.removeItem('lastModo');
     localStorage.removeItem('pedidoPendiente');
-    localStorage.removeItem('ambientResumeUri'); // Limpiamos la memoria de ambiente
+    localStorage.removeItem('ambientResumeUri'); 
     this.player?.disconnect();
     this.router.navigate(['/login']);
   }
