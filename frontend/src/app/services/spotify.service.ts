@@ -27,17 +27,23 @@ export class SpotifyConnectService {
     });
   }
 
+  // --- ESTE ES EL MÉTODO QUE TE FALTABA ---
+  getPlaylist(id: string, barId: number): Observable<any> {
+    return this.http.get(`${this.apiUrl}/playlist`, { 
+      params: { id: id, barId: barId.toString() } 
+    });
+  }
+
   playTrack(spotifyId: string, deviceId: string, barId: number): Observable<any> {
     return this.http.post(`${this.apiUrl}/play`, { barId, deviceId, spotifyId });
   }
 
-  // MÉTODO ACTUALIZADO: offsetUri es opcional
   playContext(contextUri: string, deviceId: string, barId: number, offsetUri?: string): Observable<any> {
     return this.http.post(`${this.apiUrl}/play`, { 
       barId, 
       deviceId, 
       contextUri,
-      offsetUri // Se enviará al backend
+      offsetUri
     });
   }
 }

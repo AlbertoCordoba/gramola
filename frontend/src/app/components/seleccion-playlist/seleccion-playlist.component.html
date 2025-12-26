@@ -28,16 +28,21 @@
 
       <div class="results-list" *ngIf="resultados.length > 0">
         <div class="playlist-item" *ngFor="let pl of resultados" (click)="seleccionar(pl)">
-          <img [src]="pl.images[0]?.url || 'assets/disc.png'" class="pl-img">
+          
+          <img [src]="(pl.images && pl.images.length > 0) ? pl.images[0].url : 'assets/disc.png'" 
+               class="pl-img" 
+               alt="Portada">
+
           <div class="pl-info">
             <span class="pl-name">{{ pl.name }}</span>
-            <span class="pl-tracks">{{ pl.tracks.total }} canciones</span>
+            <span class="pl-tracks">{{ pl.tracks?.total || 0 }} canciones</span>
           </div>
           <button class="btn-select">Elegir</button>
         </div>
       </div>
       
-      <p *ngIf="resultados.length === 0 && busqueda" class="no-results">No se encontraron playlists.</p>
+      <p *ngIf="resultados.length === 0 && busqueda && !cargando" class="no-results">No se encontraron playlists.</p>
+      <p *ngIf="cargando" class="no-results">Buscando...</p>
     </div>
 
   </div>

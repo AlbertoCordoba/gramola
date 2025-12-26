@@ -68,32 +68,78 @@ export class SeleccionPlaylistComponent implements OnInit {
     this.cargando = true;
     this.resultados = [];
 
-    this.spotifyService.search(this.busqueda, this.usuario.id, 'playlist').subscribe({
-      next: (res: any) => {
-        this.ngZone.run(() => {
-          this.resultados = res.playlists?.items || [];
-          this.cargando = false;
-          this.cdr.detectChanges();
-        });
-      },
-      error: (err) => {
-        console.error('Error buscando playlists', err);
-        this.ngZone.run(() => {
-          this.cargando = false;
-          this.cdr.detectChanges();
-        });
+    // 1. DETECTAR SI ES UN ENLACE DE SPOTIFY
+    if (this.busqueda.includes('spotify.com') || this.busqueda.includes('spotify.com/playlist')) {
+      
+      let playlistId = '';
+      try {
+        const partes = this.busqueda.split('playlist/');
+        if (partes.length > 1) {
+          playlistId = partes[1].split('?')[0];
+        }
+      } catch (e) {
+        console.error("Error parseando URL", e);
       }
-    });
+
+      if (playlistId) {
+        this.spotifyService.getPlaylist(playlistId, this.usuario.id).subscribe({
+          next: (res: any) => {
+            this.ngZone.run(() => {
+              // Filtro de seguridad: solo si tiene canciones
+              if (res && res.tracks && res.tracks.total > 0) {
+                this.resultados = [res];
+              } else {
+                console.warn("La playlist del enlace está vacía");
+                this.resultados = [];
+              }
+              this.cargando = false;
+              this.cdr.detectChanges();
+            });
+          },
+          // AQUI ESTABA EL ERROR 2: Añadido ': any'
+          error: (err: any) => {
+            console.error('Error cargando playlist por link', err);
+            this.ngZone.run(() => {
+              this.cargando = false;
+              this.cdr.detectChanges();
+            });
+          }
+        });
+      } else {
+        this.cargando = false;
+      }
+
+    } else {
+      // 2. BÚSQUEDA NORMAL POR NOMBRE
+      this.spotifyService.search(this.busqueda, this.usuario.id, 'playlist').subscribe({
+        next: (res: any) => {
+          this.ngZone.run(() => {
+            const items = res.playlists?.items || [];
+            
+            // Filtro mágico para evitar playlists vacías
+            this.resultados = items.filter((p: any) => 
+              p && p.tracks && p.tracks.total > 0 && p.uri
+            );
+
+            this.cargando = false;
+            this.cdr.detectChanges();
+          });
+        },
+        // AQUI TAMBIEN: Añadido ': any'
+        error: (err: any) => {
+          console.error('Error buscando playlists', err);
+          this.ngZone.run(() => {
+            this.cargando = false;
+            this.cdr.detectChanges();
+          });
+        }
+      });
+    }
   }
 
   seleccionar(playlist: any) {
-    // 1. Guardamos la nueva playlist
     localStorage.setItem('playlistFondo', JSON.stringify(playlist));
-    
-    // 2. CRÍTICO: Borramos el rastro de la canción anterior para evitar conflictos
-    // Así la Gramola sabe que debe empezar la nueva lista desde el principio.
     localStorage.removeItem('lastTrackUri'); 
-    
     this.router.navigate(['/gramola']);
   }
 
