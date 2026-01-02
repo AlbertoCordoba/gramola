@@ -22,7 +22,14 @@
       <p>Elige la playlist que sonará cuando no haya pedidos de clientes.</p>
       
       <div class="search-box">
-        <input type="text" [(ngModel)]="busqueda" (keyup.enter)="buscar()" placeholder="Ej: Rock FM, Top 50 España...">
+        <span class="search-icon" *ngIf="!cargando">🔍</span>
+        <div class="mini-spinner" *ngIf="cargando"></div>
+
+        <input type="text" 
+               [formControl]="searchControl" 
+               (keyup.enter)="buscar()" 
+               placeholder="Ej: Rock FM, Top 50 España o pega un enlace...">
+        
         <button (click)="buscar()" class="btn-search">Buscar</button>
       </div>
 
@@ -41,8 +48,10 @@
         </div>
       </div>
       
-      <p *ngIf="resultados.length === 0 && busqueda && !cargando" class="no-results">No se encontraron playlists.</p>
-      <p *ngIf="cargando" class="no-results">Buscando...</p>
+      <p *ngIf="resultados.length === 0 && searchControl.value && !cargando && searchControl.value!.length > 2" class="no-results">
+        No se encontraron playlists.
+      </p>
+      
     </div>
 
   </div>

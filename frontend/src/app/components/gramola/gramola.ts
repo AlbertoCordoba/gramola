@@ -1,9 +1,13 @@
 import { Component, inject, OnDestroy, OnInit, NgZone, ChangeDetectorRef } from '@angular/core';
 import { Router, ActivatedRoute } from '@angular/router';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormControl } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
 import { HttpClient } from '@angular/common/http';
+// IMPORTANTE: Añadimos catchError y of para que no se rompa si hay error
+import { debounceTime, distinctUntilChanged, filter, switchMap, tap, finalize, catchError } from 'rxjs/operators';
+import { of } from 'rxjs';
+
 import { SpotifyConnectService } from '../../services/spotify.service';
 import { GramolaService } from '../../services/gramola.service';
 import { PagoStateService } from '../../services/pago-state.service';
@@ -16,7 +20,6 @@ declare global {
   }
 }
 
-// Interfaz para los elementos visuales de la cola
 interface ItemCola {
   titulo: string;
   artista: string;
@@ -28,12 +31,11 @@ interface ItemCola {
 @Component({
   selector: 'app-gramola',
   standalone: true,
-  imports: [CommonModule, FormsModule, PasarelaPagoComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, PasarelaPagoComponent],
   templateUrl: './gramola.html',
   styleUrl: './gramola.css'
 })
 export class Gramola implements OnInit, OnDestroy {
-  // --- INYECCIONES ---
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private spotifyService = inject(SpotifyConnectService);
@@ -44,49 +46,41 @@ export class Gramola implements OnInit, OnDestroy {
   private cdr = inject(ChangeDetectorRef);
   private pagoState = inject(PagoStateService);
 
-  // --- DATOS BÁSICOS ---
   usuario: any = null;
   playlistFondo: any = null;
 
-  // --- BUSCADOR ---
-  busqueda: string = '';
+  searchControl = new FormControl('');
   isSearching: boolean = false;
   searchResults: any[] = [];
   
-  // --- ESTADO DE DATOS ---
-  colaReproduccion: any[] = [];   // Pedidos desde BD
-  siguientesSpotify: any[] = [];  // Next tracks desde SDK
-  tracksRespaldo: any[] = [];     // Playlist completa desde API
+  colaReproduccion: any[] = [];   
+  siguientesSpotify: any[] = [];  
+  tracksRespaldo: any[] = [];     
   
-  // --- ESTADO VISUAL ---
   colaVisual: ItemCola[] = [];
   historialVisual: any[] = [];
 
-  // --- PLAYER & PLAYBACK ---
   player: any;
   deviceId: string = '';
   currentTrack: any = null;
   isPaused: boolean = true;
   modoReproduccion: 'AMBIENTE' | 'PEDIDO' = 'AMBIENTE';
   
-  cancionSonando: any = null;  // Datos del pedido actual
-  resumeTrackUri: string = ''; // URI para retomar ambiente
+  cancionSonando: any = null;  
+  resumeTrackUri: string = ''; 
   
-  // --- PROGRESO ---
   progressMs: number = 0;
   durationMs: number = 0;
   progressPercent: number = 0;
   private progressTimer: any;
 
-  // --- CONTROL ---
   showPaymentModal: boolean = false;
   private pollingInterval: any;
   private lastTrackId: string = ''; 
   private changingTrack: boolean = false; 
-  necesitaInteraccion: boolean = false; // Controla el aviso de "Reanudar con F5/Click"
+  necesitaInteraccion: boolean = false; 
   precioCancion: number = 0;
 
-  // --- METADATOS INTERNOS ---
   private songStartTime: number = 0;     
   private wasPedido: boolean = false;    
 
@@ -98,7 +92,6 @@ export class Gramola implements OnInit, OnDestroy {
       this.router.navigate(['/login']);
     }
 
-    // Persistencia básica al cerrar/recargar
     window.addEventListener('beforeunload', () => {
         if (this.currentTrack) {
             const uriSegura = this.currentTrack.linked_from?.uri || this.currentTrack.uri;
@@ -114,17 +107,15 @@ export class Gramola implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    // 1. Cargar Playlist de Fondo
     const plGuardada = localStorage.getItem('playlistFondo');
     if (plGuardada) {
         this.playlistFondo = JSON.parse(plGuardada);
-        this.cargarTracksDeRespaldo(); // Carga inmediata de la lista completa
+        this.cargarTracksDeRespaldo(); 
     } else {
         this.router.navigate(['/config-audio']);
         return;
     }
 
-    // 2. Recuperar estado (si venimos de F5)
     const lastModo = localStorage.getItem('lastModo');
     if (lastModo === 'PEDIDO') {
         this.modoReproduccion = 'PEDIDO';
@@ -136,20 +127,20 @@ export class Gramola implements OnInit, OnDestroy {
         this.resumeTrackUri = savedAmbient;
     }
 
-    // 3. Iniciar lógica
     if (this.usuario) {
       this.initSpotifySDK();
       this.cargarCola(); 
       this.cargarPrecioCancion();
       
-      // Polling de pedidos
+      // INICIALIZAR BÚSQUEDA EN VIVO
+      this.setupLiveSearch();
+
       this.pollingInterval = setInterval(() => {
         if (!this.changingTrack) {
           this.cargarCola();
         }
       }, 5000);
 
-      // Timer de la barra
       this.progressTimer = setInterval(() => {
         if (!this.isPaused && this.currentTrack) {
           this.progressMs += 1000;
@@ -163,17 +154,65 @@ export class Gramola implements OnInit, OnDestroy {
     }
   }
 
-  // --- CARGA DE DATOS DE RESPALDO ---
+  // --- BÚSQUEDA EN VIVO (CORREGIDA Y ROBUSTA) ---
+  setupLiveSearch() {
+    this.searchControl.valueChanges.pipe(
+      // 1. IMPORTANTE: Debes escribir al menos 3 letras
+      filter(text => (text || '').trim().length > 2),
+      
+      debounceTime(500),
+      distinctUntilChanged(),
+      
+      tap(() => {
+        this.ngZone.run(() => {
+          this.isSearching = true;
+          this.cdr.detectChanges();
+        });
+      }),
+      
+      switchMap(text => {
+        return this.spotifyService.search(text!, this.usuario.id, 'track').pipe(
+          // Si falla la API, capturamos el error DENTRO del switchMap
+          // para que el listener principal NO SE ROMPA.
+          catchError(err => {
+            console.error('Error en búsqueda Spotify:', err);
+            return of(null); // Devolvemos observable vacío para seguir vivos
+          }),
+          finalize(() => { 
+             // Finalize se ejecuta siempre tras éxito o error del switchMap
+          })
+        );
+      })
+    ).subscribe({
+      next: (res: any) => {
+        this.ngZone.run(() => {
+          this.isSearching = false;
+          if (res && res.tracks) {
+            this.searchResults = res.tracks.items || [];
+          } else {
+            this.searchResults = []; // Si hubo error (res=null) limpiamos
+          }
+          this.cdr.detectChanges();
+        });
+      },
+      error: (err) => {
+        // Este error solo salta si falla algo crítico en el pipe principal
+        console.error("Error crítico en buscador:", err);
+        this.isSearching = false;
+      }
+    });
+  }
+
+  // --- RESTO DE MÉTODOS IGUAL QUE ANTES ---
+
   cargarTracksDeRespaldo() {
     if (!this.playlistFondo?.id) return;
-    
     this.spotifyService.getPlaylist(this.playlistFondo.id, this.usuario.id).subscribe({
       next: (res: any) => {
         if (res.tracks && res.tracks.items) {
           this.tracksRespaldo = res.tracks.items
             .map((item: any) => item.track)
             .filter((t: any) => t && t.id);
-          
           this.actualizarColaVisual();
         }
       },
@@ -181,45 +220,30 @@ export class Gramola implements OnInit, OnDestroy {
     });
   }
 
-  // --- HELPERS PARA BÚSQUEDA ROBUSTA ---
-  
-  // Genera una clave única "titulo|artista" para comparar
   private getTrackKey(titulo: string, artista: string): string {
     return `${titulo?.toLowerCase().trim().replace(/[^a-z0-9]/g, '')}|${artista?.toLowerCase().trim().replace(/[^a-z0-9]/g, '')}`;
   }
 
-  // Encuentra el índice de una canción en el respaldo usando ID, URI o Nombre+Artista
   private encontrarIndiceSeguro(trackId: string, trackUri: string, trackName: string, trackArtist: string): number {
     if (!this.tracksRespaldo || this.tracksRespaldo.length === 0) return -1;
-
-    // 1. Intento exacto por ID
     let idx = this.tracksRespaldo.findIndex(t => t.id === trackId);
     if (idx !== -1) return idx;
-
-    // 2. Intento exacto por URI
     if (trackUri) {
         idx = this.tracksRespaldo.findIndex(t => t.uri === trackUri);
         if (idx !== -1) return idx;
     }
-
-    // 3. Intento "borroso" por Nombre y Artista (Infalible para versiones re-linkeadas)
     const keyBuscada = this.getTrackKey(trackName, trackArtist);
     idx = this.tracksRespaldo.findIndex(t => 
         this.getTrackKey(t.name, t.artists[0]?.name) === keyBuscada
     );
-
     return idx;
   }
 
-  // ==========================================
-  // LÓGICA DE LA COLA VISUAL CORREGIDA
-  // ==========================================
   actualizarColaVisual() {
     const listaFinal: ItemCola[] = [];
     const MINIMO_CANCIONES = 5;
     const clavesAgregadas = new Set<string>();
 
-    // 0. Datos de la canción actual
     let currentId = '';
     let currentKey = '';
     if (this.currentTrack) {
@@ -230,10 +254,8 @@ export class Gramola implements OnInit, OnDestroy {
         clavesAgregadas.add(currentKey); 
     }
 
-    // 1. AÑADIR PEDIDOS (Prioridad)
     this.colaReproduccion.forEach(p => {
       const key = this.getTrackKey(p.titulo, p.artista);
-      // Evitamos añadir si es la que está sonando
       if (p.spotifyId !== currentId && !clavesAgregadas.has(key)) {
           listaFinal.push({
             titulo: p.titulo,
@@ -246,25 +268,15 @@ export class Gramola implements OnInit, OnDestroy {
       }
     });
 
-    // 2. RELLENAR CON AMBIENTE
     if (listaFinal.length < MINIMO_CANCIONES) {
-        
         let candidatosAmbiente: any[] = [];
-
-        // A) SDK Spotify (Prioridad en modo Ambiente puro si hay datos válidos)
         if (this.modoReproduccion === 'AMBIENTE' && this.siguientesSpotify.length > 0) {
             candidatosAmbiente = [...this.siguientesSpotify];
         } 
-        
-        // B) Respaldo Playlist (Calculado con la nueva función robusta)
         if (candidatosAmbiente.length < MINIMO_CANCIONES && this.tracksRespaldo.length > 0) {
-            
             let refId = '', refUri = '', refName = '', refArtist = '';
-            let usarReferenciaGuardada = true; // Por defecto asumimos que usaremos la guardada
+            let usarReferenciaGuardada = true;
 
-            // <--- CORRECCIÓN PRINCIPAL AQUÍ --->
-            // Si estamos en AMBIENTE y hay un track sonando, verificamos si es de la lista de respaldo.
-            // Si NO está en el respaldo (es el track de pago que termina), lo ignoramos.
             if (this.modoReproduccion === 'AMBIENTE' && this.currentTrack) {
                 const testIdx = this.encontrarIndiceSeguro(
                     currentId, 
@@ -272,8 +284,6 @@ export class Gramola implements OnInit, OnDestroy {
                     this.currentTrack.name, 
                     this.currentTrack.artists[0]?.name
                 );
-
-                // Si encontramos el track en el respaldo, es seguro usarlo como referencia
                 if (testIdx !== -1) {
                     refId = currentId;
                     refUri = this.currentTrack.uri;
@@ -281,11 +291,8 @@ export class Gramola implements OnInit, OnDestroy {
                     refArtist = this.currentTrack.artists[0]?.name;
                     usarReferenciaGuardada = false;
                 }
-                // Si testIdx es -1, significa que currentTrack es la canción de pago "fantasma".
-                // Dejamos usarReferenciaGuardada en true.
             }
 
-            // Si decidimos usar la referencia guardada (porque era Pedido o transición sucia)
             if (usarReferenciaGuardada) {
                 const uri = this.resumeTrackUri || localStorage.getItem('ambientResumeUri');
                 if (uri) {
@@ -300,33 +307,21 @@ export class Gramola implements OnInit, OnDestroy {
                 }
             }
 
-            // Usamos la función robusta para encontrar el índice
             let indice = this.encontrarIndiceSeguro(refId, refUri, refName, refArtist);
-            
-            // Si no se encuentra, empezamos desde el principio
             if (indice === -1) indice = 0;
-
-            // <--- AJUSTE DE OFFSET --->
-            // - Si estamos en PEDIDO o usando Referencia Guardada (transición): Offset 0 (queremos ver 'esa' canción)
-            // - Si estamos en AMBIENTE REAL (usarReferenciaGuardada = false): Offset 1 (queremos la siguiente)
             let inicioOffset = (this.modoReproduccion === 'PEDIDO' || usarReferenciaGuardada) ? 0 : 1;
 
-            // Cogemos candidatos del respaldo (Circular)
             for (let i = inicioOffset; i <= 20; i++) {
                 const nextIndex = (indice + i) % this.tracksRespaldo.length;
                 candidatosAmbiente.push(this.tracksRespaldo[nextIndex]);
             }
         }
 
-        // C) Volcar candidatos filtrando
         for (const track of candidatosAmbiente) {
             if (listaFinal.length >= MINIMO_CANCIONES) break;
-            
             const nombre = track.name;
             const artista = track.artists[0]?.name;
             const key = this.getTrackKey(nombre, artista);
-
-            // Filtro Maestro: Ni la que suena, ni repetidas
             if (clavesAgregadas.has(key)) continue;
             if (track.id === currentId) continue;
 
@@ -340,7 +335,6 @@ export class Gramola implements OnInit, OnDestroy {
             clavesAgregadas.add(key);
         }
     }
-
     this.colaVisual = listaFinal;
     this.cdr.detectChanges();
   }
@@ -356,7 +350,6 @@ export class Gramola implements OnInit, OnDestroy {
     });
   }
 
-  // --- SPOTIFY INIT & CONNECT ---
   initSpotifySDK() {
     if (window.Spotify) {
       this.requestTokenAndConnect();
@@ -393,7 +386,6 @@ export class Gramola implements OnInit, OnDestroy {
       this.ngZone.run(() => {
         console.log('Player ID Ready:', device_id);
         this.deviceId = device_id;
-        // Restaurar estado tras 1s
         setTimeout(() => this.restaurarEstado(), 1000); 
       });
     });
@@ -411,7 +403,6 @@ export class Gramola implements OnInit, OnDestroy {
     this.player.connect();
   }
 
-  // --- RESTAURAR ESTADO (F5) ---
   restaurarEstado() {
     const lastModo = localStorage.getItem('lastModo');
     const pedidoJson = localStorage.getItem('pedidoPendiente');
@@ -448,11 +439,9 @@ export class Gramola implements OnInit, OnDestroy {
     }
   }
 
-  // --- CHEQUEO DE AUTOPLAY (VENTANA DE AVISO) ---
   verificarAutoplay() {
     setTimeout(() => {
         this.player.getCurrentState().then((state: any) => {
-            // Si no hay estado o está pausado -> Bloqueado
             if (!state || state.paused) {
                 this.ngZone.run(() => {
                     this.necesitaInteraccion = true;
@@ -467,7 +456,6 @@ export class Gramola implements OnInit, OnDestroy {
     }, 2000);
   }
 
-  // --- CAMBIO DE ESTADO (TRACKS) ---
   gestionarCambioDeEstado(state: any) {
     if (!state) return;
     const track = state.track_window.current_track;
@@ -483,7 +471,6 @@ export class Gramola implements OnInit, OnDestroy {
     const trackId = track.linked_from?.id || track.id;
     const context = state.context;
     
-    // Verificamos si estamos en la playlist de ambiente
     const esMismaPlaylist = context && this.playlistFondo && context.uri && this.playlistFondo.uri &&
                             (context.uri === this.playlistFondo.uri || context.uri.includes(this.playlistFondo.id));
 
@@ -494,7 +481,6 @@ export class Gramola implements OnInit, OnDestroy {
          }
     }
 
-    // Salto de Pedido a Ambiente
     if (this.lastTrackId && trackId !== this.lastTrackId && this.modoReproduccion === 'PEDIDO' && !this.changingTrack) {
         this.finalizarPedidoActual(); 
         if (this.colaReproduccion.length > 0) {
@@ -502,7 +488,6 @@ export class Gramola implements OnInit, OnDestroy {
         } else {
              this.modoReproduccion = 'AMBIENTE';
              localStorage.removeItem('pedidoPendiente');
-             // Forzamos ambiente
              this.reproducirAmbiente(); 
         }
     }
@@ -550,7 +535,7 @@ export class Gramola implements OnInit, OnDestroy {
     }
 
     this.lastTrackId = trackId;
-    this.actualizarColaVisual(); // Refrescar visual
+    this.actualizarColaVisual();
     this.cdr.detectChanges();
   }
 
@@ -584,7 +569,6 @@ export class Gramola implements OnInit, OnDestroy {
              this.resumeTrackUri = '';
              this.spotifyService.playContext(this.playlistFondo.uri, this.deviceId, this.usuario.id, undefined).subscribe({
                  next: () => {
-                    // Chequear autoplay tras reintento
                     if (chequearAutoplay) this.verificarAutoplay();
                     else this.resetVariables();
                  },
@@ -685,19 +669,12 @@ export class Gramola implements OnInit, OnDestroy {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 
+  // --- BÚSQUEDA MANUAL (Por si alguien da Enter) ---
   search() {
-    if (!this.busqueda || this.busqueda.trim().length <= 2) return;
-    this.isSearching = true; 
-    this.spotifyService.search(this.busqueda, this.usuario.id, 'track').subscribe({
-      next: (res: any) => {
-        this.ngZone.run(() => {
-            this.searchResults = res?.tracks?.items || [];
-            this.isSearching = false;
-            this.cdr.detectChanges(); 
-        });
-      },
-      error: () => this.isSearching = false
-    });
+    const val = this.searchControl.value;
+    if (val && val.trim().length > 2) {
+        this.searchControl.setValue(val); // Dispara el listener del control
+    }
   }
 
   anadir(track: any) {
@@ -722,7 +699,7 @@ export class Gramola implements OnInit, OnDestroy {
   onPaymentClosed(success: boolean) {
     this.showPaymentModal = false;
     if (success) {
-      this.busqueda = '';
+      this.searchControl.setValue('', { emitEvent: false }); // Limpiamos sin disparar búsqueda
       this.searchResults = [];
       this.cargarCola();
     }
