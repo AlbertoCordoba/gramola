@@ -80,20 +80,30 @@
       <div class="lists-layout">
         
         <section class="queue-section">
-          <h3 class="section-title">Cola de Pedidos</h3>
-          <div *ngIf="colaReproduccion.length === 0" class="empty-state-glass">
-            <div class="empty-icon">😌</div>
-            <p>No hay pedidos en espera.</p>
-          </div>
-          <div class="queue-list" *ngIf="colaReproduccion.length > 0">
-            <div class="queue-card" *ngFor="let item of colaReproduccion; let i = index">
+          <h3 class="section-title">Próximas Canciones</h3>
+          
+          <div class="queue-list">
+            <div class="queue-card" *ngFor="let item of colaVisual; let i = index" 
+                 [class.is-spotify]="item.tipo === 'AMBIENTE'">
+              
               <div class="q-index">{{ i + 1 }}</div>
+              
+              <img *ngIf="item.imagen" [src]="item.imagen" class="q-thumb" alt="art">
+              <div *ngIf="!item.imagen" class="q-thumb-placeholder">🎵</div>
+
               <div class="q-info">
                 <span class="q-title">{{ item.titulo }}</span>
                 <span class="q-artist">{{ item.artista }}</span>
               </div>
-              <span class="badge-wait">En espera</span>
+
+              <span class="badge-wait" *ngIf="item.tipo === 'PEDIDO'">💎 Pedido</span>
+              <span class="badge-wait ambient" *ngIf="item.tipo === 'AMBIENTE'">📻 Ambiente</span>
             </div>
+          </div>
+
+          <div *ngIf="colaVisual.length === 0" class="empty-state-glass">
+            <div class="empty-icon">😌</div>
+            <p>Esperando música...</p>
           </div>
         </section>
 
@@ -119,16 +129,5 @@
   </main>
 
   <app-pasarela-pago *ngIf="showPaymentModal" [isModal]="true" (close)="onPaymentClosed($event)"></app-pasarela-pago>
-
-  <div *ngIf="necesitaInteraccion" class="autoplay-overlay fade-in">
-    <div class="overlay-content glass-effect">
-      <div class="icon-sound">🔇</div>
-      <h2>Reanudar Sesión</h2>
-      <p>El navegador ha pausado el audio automáticamente al recargar.</p>
-      <button class="btn-activate" (click)="activarSonidoManual()">
-        ▶ Activar Sonido
-      </button>
-    </div>
-  </div>
 
 </div>

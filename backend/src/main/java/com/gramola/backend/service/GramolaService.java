@@ -36,9 +36,9 @@ public class GramolaService {
             throw new RuntimeException(e.getMessage());
         }
 
-    BigDecimal precioCancion = preciosRepository.findByClave("PRECIO_CANCION")
-        .map(ConfiguracionPrecios::getValor)
-        .orElseThrow(() -> new RuntimeException("No se ha configurado el precio de la canción en la base de datos"));
+        BigDecimal precioCancion = preciosRepository.findByClave("PRECIO_CANCION")
+            .map(ConfiguracionPrecios::getValor)
+            .orElseThrow(() -> new RuntimeException("No se ha configurado el precio de la canción en la base de datos"));
 
         Long barId = Long.valueOf(datos.get("barId").toString());
         CancionSolicitada cancion = new CancionSolicitada();
@@ -47,6 +47,11 @@ public class GramolaService {
         cancion.setTitulo((String) datos.get("titulo"));
         cancion.setArtista((String) datos.get("artista"));
         cancion.setPreviewUrl((String) datos.get("previewUrl"));
+        
+        // --- NUEVO: GUARDAR IMAGEN ---
+        if (datos.containsKey("imagenUrl")) {
+            cancion.setImagenUrl((String) datos.get("imagenUrl"));
+        }
         
         Object duracionObj = datos.get("duracionMs");
         cancion.setDuracionMs(duracionObj instanceof Number ? ((Number) duracionObj).intValue() : 0);

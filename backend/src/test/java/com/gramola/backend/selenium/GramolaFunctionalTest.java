@@ -14,8 +14,8 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
-import java.io.File;
 import java.time.Duration;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -23,174 +23,182 @@ public class GramolaFunctionalTest {
 
     private WebDriver driver;
     private WebDriverWait wait;
+    
+    // Carpeta segura para guardar tu sesión
+    private static final String RUTA_PERFIL = System.getProperty("user.home") + "/selenium-chrome-profile";
 
     @BeforeAll
     public static void setupClass() {
-        // ACTUALIZADO: Usamos la versión 143 que coincide con tu Brave
-        WebDriverManager.chromedriver().browserVersion("143").setup();
+        WebDriverManager.chromedriver().setup();
     }
 
     @BeforeEach
     public void setUp() {
+        System.out.println("📂 Usando perfil persistente en: " + RUTA_PERFIL);
+        
         ChromeOptions options = new ChromeOptions();
         options.addArguments("--remote-allow-origins=*");
-        
-        // 1. PERMITIR AUDIO AUTOMÁTICO
         options.addArguments("--autoplay-policy=no-user-gesture-required");
-        options.addArguments("--disable-features=AudioServiceOutOfProcess"); 
-
-        // 2. RUTA DE BRAVE
-        String bravePath = "/Applications/Brave Browser.app/Contents/MacOS/Brave Browser";
-        File braveBinary = new File(bravePath);
-        if (braveBinary.exists()) {
-            options.setBinary(bravePath);
-        }
-
-        // 3. USAR TU PERFIL REAL (COPIA)
-        // Asegúrate de que la carpeta PerfilTest existe en el escritorio y tiene tu sesión
-        String userHome = System.getProperty("user.home");
-        String copiaPerfilDir = userHome + "/Desktop/PerfilTest"; 
         
-        options.addArguments("user-data-dir=" + copiaPerfilDir);
-        options.addArguments("profile-directory=Default"); 
+        // --- ARREGLO DE COLORES (FORZAR MODO OSCURO) ---
+        // Esto hace que Chrome crea que tu sistema está en modo oscuro
+        options.addArguments("--force-dark-mode"); 
+        options.addArguments("--enable-features=WebUIDarkMode");
+        
+        // --- ARREGLO DE SESIÓN ---
+        options.addArguments("user-data-dir=" + RUTA_PERFIL);
+        options.addArguments("--profile-directory=Default"); 
 
         driver = new ChromeDriver(options);
         wait = new WebDriverWait(driver, Duration.ofSeconds(20));
         driver.manage().window().maximize();
     }
 
-    @Test
-    public void testFlujoRealJC_Reyes() {
-        // 1. LOGIN INTELIGENTE
+    private void prepararEntornoGramola(String busquedaPlaylist) {
+        // 1. FORZAR LOGIN SIEMPRE
         driver.get("http://localhost:4200/login");
         
-        // Esperamos un momento para ver dónde estamos
-        try { Thread.sleep(2000); } catch (InterruptedException e) {}
+        JavascriptExecutor js = (JavascriptExecutor) driver;
+        js.executeScript("window.localStorage.clear();");
+        js.executeScript("window.sessionStorage.clear();");
+        driver.navigate().refresh();
 
-        // Si la URL sigue siendo /login, ES OBLIGATORIO LOGUEARSE
-        if (driver.getCurrentUrl().contains("/login")) {
-            System.out.println("🔒 Detectada pantalla de login. Iniciando sesión...");
-            try {
-                WebElement emailInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.name("email")));
-                emailInput.clear();
-                emailInput.sendKeys("bar@test.com"); 
-                driver.findElement(By.name("password")).sendKeys("1234");
-                driver.findElement(By.className("btn-login")).click();
-            } catch (Exception e) {
-                System.err.println("❌ Error intentando loguear: " + e.getMessage());
-            }
-        } else {
-            System.out.println("ℹ️ Ya estabas logueado (cookie detectada).");
-        }
+        System.out.println("🔒 Escribiendo credenciales en Gramola...");
+        WebElement emailInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.name("email")));
+        emailInput.clear();
+        emailInput.sendKeys("bar@test.com"); 
+        driver.findElement(By.name("password")).sendKeys("1234");
+        driver.findElement(By.className("btn-login")).click();
 
-        // Esperamos a entrar a la app (Dashboard o Config)
-        wait.until(ExpectedConditions.urlContains("config-audio")); // O la ruta a la que redirija tu login
+        // 2. LÓGICA DE SEMÁFORO (CONNECT vs BUSCADOR)
+        // Esperamos a llegar a la pantalla de configuración
+        wait.until(ExpectedConditions.urlContains("config-audio"));
+
+        System.out.println("🚦 Decidiendo si conectar Spotify o buscar...");
+
+        // Esta lógica es mucho más robusta:
+        // Buscamos si existe el botón de conectar. Si existe (size > 0), clicamos.
+        // Si no existe, asumimos que ya estamos conectados.
         
-        // IMPORTANTE: Navegar a /gramola si no estamos allí
-        if (!driver.getCurrentUrl().contains("/gramola")) {
-             // 2. INYECTAR PLAYLIST JC REYES
-            JavascriptExecutor js = (JavascriptExecutor) driver;
-            js.executeScript(
-                "localStorage.setItem('playlistFondo', JSON.stringify({" +
-                    "name: 'JC Reyes Mix'," +
-                    "uri: 'spotify:artist:0FwnPHExlRRxEZPLAi5tmG'," + 
-                    "images: [{url: 'https://i.scdn.co/image/ab6761610000e5ebf7d9c6f2d2c5e5c5b5c5c5c5'}]," +
-                    "tracks: {total: 20}" +
-                "}));"
-            );
-            driver.get("http://localhost:4200/gramola");
+        // Damos un pequeño respiro para que Angular pinte la pantalla
+        try { Thread.sleep(1500); } catch (Exception e) {}
+
+        List<WebElement> botonesConectar = driver.findElements(By.cssSelector(".connect-screen .btn-primary"));
+        
+        if (!botonesConectar.isEmpty() && botonesConectar.get(0).isDisplayed()) {
+            System.out.println("🔌 Botón encontrado. Pulsando CONECTAR...");
+            botonesConectar.get(0).click();
+
+            // Espera de seguridad por si pide login de Spotify
+            try {
+                Thread.sleep(2000);
+                if (!driver.getCurrentUrl().contains("config-audio")) {
+                    System.out.println("\n🛑 ALTO: Spotify pide login. Tienes 3 minutos.");
+                    new WebDriverWait(driver, Duration.ofSeconds(180))
+                        .until(ExpectedConditions.urlContains("config-audio"));
+                    System.out.println("✅ Login completado.");
+                }
+            } catch (Exception e) {}
+            
+        } else {
+            System.out.println("✅ No hay botón de conectar. Ya estamos listos.");
         }
 
-        // --- ACTIVAR AUDIO ---
-        try {
-            Thread.sleep(2000); 
-            driver.findElement(By.tagName("body")).click(); 
-            System.out.println("⏳ Conectando con Spotify...");
-            Thread.sleep(3000); 
-        } catch (InterruptedException e) {}
-
-        // 4. BUSCAR "FARDOS"
-        WebElement searchInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".search-input")));
+        // 3. BUSQUEDA PLAYLIST (Ahora estamos seguros de estar conectados)
+        System.out.println("📻 Buscando playlist real: " + busquedaPlaylist);
+        
+        // Esperamos explícitamente a que el input sea VISIBLE e INTERACTUABLE
+        WebElement searchInput = wait.until(ExpectedConditions.elementToBeClickable(By.cssSelector(".search-box input")));
         searchInput.clear();
-        searchInput.sendKeys("Green lantern");
+        searchInput.sendKeys(busquedaPlaylist);
+        
         driver.findElement(By.className("btn-search")).click();
 
-        // 5. AÑADIR A LA COLA
-        WebElement resultsOverlay = wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-overlay")));
-        try { Thread.sleep(1500); } catch (Exception e) {} 
-        
-        resultsOverlay.findElement(By.className("btn-add")).click();
+        wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-list")));
+        try { Thread.sleep(1000); } catch (Exception e) {} 
 
-        // 6. PAGAR
+        wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-select"))).click();
+
+        // 4. ENTRADA A GRAMOLA
+        wait.until(ExpectedConditions.urlContains("/gramola"));
+        gestionarAudio();
+    }
+    
+    private void gestionarAudio() {
+        try {
+            // Intentamos buscar el botón de activar sonido durante 3 segundos
+            WebDriverWait audioWait = new WebDriverWait(driver, Duration.ofSeconds(3));
+            WebElement btn = audioWait.until(ExpectedConditions.elementToBeClickable(By.cssSelector(".btn-activate")));
+            btn.click();
+            System.out.println("🔊 Audio activado.");
+        } catch (Exception e) {
+            // Si no sale botón, hacemos click en el fondo por si acaso
+            driver.findElement(By.tagName("body")).click();
+        }
+    }
+
+    @Test
+    public void testFlujoRealFernando_Costa() {
+        prepararEntornoGramola("Fernando Costa");
+
+        WebElement searchInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".search-input")));
+        searchInput.clear();
+        searchInput.sendKeys("Malamanera");
+        
+        wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-search"))).click();
+
+        WebElement resultsOverlay = wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-overlay")));
+        try { Thread.sleep(1000); } catch (Exception e) {} 
+        
+        wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-add"))).click();
+
         WebElement modalPago = wait.until(ExpectedConditions.visibilityOfElementLocated(By.tagName("app-pasarela-pago")));
-        modalPago.findElement(By.cssSelector("input[placeholder='NOMBRE APELLIDOS']")).sendKeys("Usuario JC");
+        modalPago.findElement(By.cssSelector("input[placeholder='NOMBRE APELLIDOS']")).sendKeys("Tester Pro");
         modalPago.findElement(By.cssSelector("input[placeholder='0000 0000 0000 0000']")).sendKeys("1234567812345678");
         modalPago.findElement(By.cssSelector("input[placeholder='MM/AA']")).sendKeys("12/30");
         modalPago.findElement(By.cssSelector("input[placeholder='123']")).sendKeys("123");
         
-        modalPago.findElement(By.className("btn-pay")).click();
+        wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-pay"))).click();
 
-        // 7. VERIFICAR ÉXITO
         WebElement successView = wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("success-view")));
         assertTrue(successView.isDisplayed());
-        System.out.println("✅ ¡Pedido completado! Escucha...");
-
-        try { Thread.sleep(20000); } catch (InterruptedException e) {}
+        
+        System.out.println("✅ Test completado. 🎶 Reproduciendo canción durante 60 segundos...");
+        try { Thread.sleep(60000); } catch (InterruptedException e) {}
     }
 
     @Test
     public void testPagoConDatosIncorrectos() {
-        driver.get("http://localhost:4200/login");
-        // Lógica de login simplificada para el test de error
-        if (driver.getCurrentUrl().contains("/login")) {
-            try {
-                driver.findElement(By.name("email")).sendKeys("bar@test.com"); 
-                driver.findElement(By.name("password")).sendKeys("1234");
-                driver.findElement(By.className("btn-login")).click();
-            } catch (Exception e) {}
-        }
+        prepararEntornoGramola("Rock FM");
 
-        // Inyectamos cualquier playlist
-        JavascriptExecutor js = (JavascriptExecutor) driver;
-        js.executeScript("localStorage.setItem('playlistFondo', JSON.stringify({name:'Test', uri:'mock', images:[{url:''}], tracks:{total:10}}));");
-
-        driver.get("http://localhost:4200/gramola");
-        
         WebElement searchInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".search-input")));
-        searchInput.sendKeys("Error");
-        driver.findElement(By.className("btn-search")).click();
+        searchInput.clear();
+        searchInput.sendKeys("Bohemian Rhapsody");
+        wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-search"))).click();
 
         WebElement resultsOverlay = wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-overlay")));
-        resultsOverlay.findElement(By.className("btn-add")).click();
+        try { Thread.sleep(1000); } catch (Exception e) {} 
+        wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-add"))).click();
 
         WebElement modalPago = wait.until(ExpectedConditions.visibilityOfElementLocated(By.tagName("app-pasarela-pago")));
-        modalPago.findElement(By.cssSelector("input[placeholder='NOMBRE APELLIDOS']")).sendKeys("Usuario Fail");
         modalPago.findElement(By.cssSelector("input[placeholder='0000 0000 0000 0000']")).sendKeys("123"); 
-        modalPago.findElement(By.cssSelector("input[placeholder='MM/AA']")).sendKeys("12/30");
-        modalPago.findElement(By.cssSelector("input[placeholder='123']")).sendKeys("123");
-
-        modalPago.findElement(By.className("btn-pay")).click();
+        wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-pay"))).click();
 
         boolean exitoVisible = false;
         try {
-            WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(2));
+            WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(3));
             shortWait.until(ExpectedConditions.visibilityOfElementLocated(By.className("success-view")));
             exitoVisible = true;
-        } catch (Exception e) {
-            exitoVisible = false;
-        }
+        } catch (Exception e) {}
 
-        if (!exitoVisible) {
-            System.out.println("✅ Test ERROR superado.");
-        } else {
-            throw new RuntimeException("❌ Fallo: Se permitió pagar con tarjeta falsa.");
-        }
+        if (!exitoVisible) System.out.println("✅ Test Error OK.");
+        else throw new RuntimeException("❌ Fallo: Pago incorrecto permitido.");
     }
 
     @AfterEach
     public void tearDown() {
         if (driver != null) {
-            driver.quit();
+             driver.quit();
         }
     }
 }
