@@ -130,15 +130,4 @@
 
   <app-pasarela-pago *ngIf="showPaymentModal" [isModal]="true" (close)="onPaymentClosed($event)"></app-pasarela-pago>
 
-  <div *ngIf="necesitaInteraccion" class="autoplay-overlay fade-in">
-    <div class="overlay-content glass-effect">
-      <div class="icon-sound">🔇</div>
-      <h2>Reanudar Sesión</h2>
-      <p>El navegador ha pausado el audio automáticamente al recargar.</p>
-      <button class="btn-activate" (click)="activarSonidoManual()">
-        ▶ Activar Sonido
-      </button>
-    </div>
-  </div>
-
 </div>
