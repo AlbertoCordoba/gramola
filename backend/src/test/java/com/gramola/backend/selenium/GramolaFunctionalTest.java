@@ -112,7 +112,7 @@ public class GramolaFunctionalTest {
         // 4. BUSCAR "FARDOS"
         WebElement searchInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".search-input")));
         searchInput.clear();
-        searchInput.sendKeys("Green lantern");
+        searchInput.sendKeys("Fardos");
         driver.findElement(By.className("btn-search")).click();
 
         // 5. AÑADIR A LA COLA

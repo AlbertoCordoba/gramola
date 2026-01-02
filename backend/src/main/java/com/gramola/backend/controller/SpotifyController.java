@@ -47,6 +47,16 @@ public class SpotifyController {
     public ResponseEntity<?> search(@RequestParam String q, @RequestParam Long barId, @RequestParam(defaultValue = "track") String type) {
         return ResponseEntity.ok(spotifyService.search(q, type, barId));
     }
+
+    // --- ESTE ES EL MÉTODO QUE FALTABA PARA QUE FUNCIONE EL RELLENO DE LA COLA ---
+    @GetMapping("/playlist")
+    public ResponseEntity<?> getPlaylist(@RequestParam String id, @RequestParam Long barId) {
+        try {
+            return ResponseEntity.ok(spotifyService.getPlaylist(id, barId));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
+        }
+    }
     
     @PostMapping("/play")
     public ResponseEntity<?> play(@RequestBody Map<String, Object> payload) {
