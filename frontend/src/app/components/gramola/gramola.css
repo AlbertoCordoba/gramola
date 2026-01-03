@@ -184,7 +184,7 @@
   box-shadow: 0 0 10px var(--primary);
 }
 
-/* --- SEARCH (Original + Ajustes) --- */
+/* --- SEARCH --- */
 .search-section { margin-bottom: 40px; }
 
 .search-glass {
@@ -204,7 +204,20 @@
   transform: scale(1.01);
 }
 
+.search-icon, .mini-spinner {
+  width: 24px;
+  display: flex; justify-content: center;
+}
+
 .search-icon { font-size: 1.6rem; color: #888; }
+
+.mini-spinner {
+  width: 20px; height: 20px;
+  border: 3px solid rgba(255,255,255,0.1);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
 
 .search-input {
   flex: 1; background: transparent; border: none; color: white;
@@ -223,7 +236,7 @@
 }
 .btn-search:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(30, 215, 96, 0.5); }
 
-/* --- RESULTS OVERLAY (Original intacto) --- */
+/* --- RESULTS OVERLAY --- */
 .results-overlay {
   background: rgba(18, 18, 18, 0.98); border-radius: 20px; padding: 30px;
   margin-top: 20px; box-shadow: 0 20px 80px rgba(0,0,0,0.9);
@@ -260,9 +273,18 @@
 }
 .btn-add:hover { transform: scale(1.1) rotate(90deg); background: white; }
 
-/* --- NUEVO: LAYOUT DE 2 COLUMNAS (COLA + HISTORIAL) --- */
+/* ==============================================================
+   AJUSTES CLAVE PARA EVITAR ROTURAS POR TEXTOS LARGOS
+   ============================================================== */
+
+/* --- NUEVO LAYOUT GRID --- */
 .lists-layout { 
-  display: grid; grid-template-columns: 1.3fr 0.7fr; gap: 40px; margin-top: 50px; 
+  display: grid; 
+  /* "minmax(0, ...)" es el truco para que el texto largo no rompa la estructura ni empuje al historial */
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); 
+  gap: 40px; 
+  margin-top: 50px; 
+  align-items: start;
 }
 
 .section-title { 
@@ -276,19 +298,18 @@
 }
 .empty-icon { font-size: 4rem; margin-bottom: 15px; opacity: 0.5; filter: grayscale(1); }
 
-/* --- COLA DE PEDIDOS Y AMBIENTE (ESTILOS UNIFICADOS) --- */
+/* --- COLA DE PEDIDOS Y AMBIENTE --- */
 .queue-card {
   display: flex; align-items: center; padding: 12px 20px;
   background: linear-gradient(90deg, rgba(30, 215, 96, 0.1) 0%, rgba(255,255,255,0.01) 100%);
   border-radius: 12px; margin-bottom: 10px;
-  border-left: 4px solid var(--primary); /* Borde verde por defecto (pedidos) */
+  border-left: 4px solid var(--primary);
   transition: all 0.2s;
 }
 
-/* Estilo específico para items de Ambiente (Sobrescribe al anterior) */
 .queue-card.is-spotify {
   background: rgba(255, 255, 255, 0.03);
-  border-left-color: rgba(255, 255, 255, 0.1); /* Borde gris tenue */
+  border-left-color: rgba(255, 255, 255, 0.1);
 }
 
 .queue-card:hover { 
@@ -298,36 +319,56 @@
 
 .q-index { 
   color: var(--text-sec); font-family: 'Montserrat', monospace; font-size: 1.1rem; 
-  width: 30px; font-weight: bold; opacity: 0.5; margin-right: 10px;
+  width: 30px; font-weight: bold; opacity: 0.5; margin-right: 10px; flex-shrink: 0;
 }
 .queue-card:hover .q-index { color: var(--primary); opacity: 1; }
 
-/* Miniatura de Album */
 .q-thumb {
-  width: 40px; height: 40px; border-radius: 6px; margin-right: 15px; object-fit: cover;
+  width: 40px; height: 40px; border-radius: 6px; margin-right: 15px; object-fit: cover; flex-shrink: 0;
 }
 .q-thumb-placeholder {
   width: 40px; height: 40px; border-radius: 6px; margin-right: 15px;
   background: rgba(255,255,255,0.1); display: flex; align-items: center; justify-content: center;
-  font-size: 1.2rem;
+  font-size: 1.2rem; flex-shrink: 0;
 }
 
-.q-info { flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-.q-title { font-weight: 700; font-size: 1rem; color: white; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* AQUÍ ASEGURAMOS QUE EL TEXTO SE CORTE CORRECTAMENTE */
+.q-info { 
+  flex: 1; 
+  min-width: 0; /* IMPRESCINDIBLE PARA EL TRUNCAMIENTO */
+  display: flex; 
+  flex-direction: column; 
+  margin-right: 15px; /* Espacio antes del badge */
+}
+
+.q-title { 
+  font-weight: 700; 
+  font-size: 1rem; 
+  color: white; 
+  margin-bottom: 2px; 
+  /* Truncamiento */
+  white-space: nowrap; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+  display: block;
+}
+
 .q-artist { color: var(--text-sec); font-size: 0.85rem; font-weight: 500; }
 
-/* Badges */
+/* AQUÍ ASEGURAMOS QUE EL BADGE NO SE APLASTE */
 .badge-wait { 
   background: rgba(30, 215, 96, 0.2); color: var(--primary); 
   padding: 4px 10px; border-radius: 20px; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 1px;
+  flex-shrink: 0; /* PROHIBIDO ENCOGER */
+  white-space: nowrap;
 }
 .badge-wait.ambient {
   background: rgba(255, 255, 255, 0.1); color: #888;
 }
 
-/* --- NUEVO: ESTILOS HISTORIAL --- */
+/* --- HISTORIAL RECIENTE --- */
 .history-card {
-  display: flex; align-items: center; padding: 12px 18px;
+  display: flex; align-items: center; padding: 15px 20px; /* Un poco más de padding */
   background: rgba(255, 255, 255, 0.02); border-radius: 10px; margin-bottom: 8px;
   opacity: 0.6; filter: grayscale(1); transition: 0.3s;
   border: 1px solid rgba(255,255,255,0.05);
@@ -335,10 +376,32 @@
 .history-card.is-ambiente { opacity: 0.4; } 
 .history-card:hover { opacity: 1; filter: grayscale(0); background: rgba(255,255,255,0.05); transform: scale(1.02); }
 
-.h-info { flex: 1; overflow: hidden; }
-.h-title { display: block; font-weight: 600; font-size: 0.9rem; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.h-info { 
+  flex: 1; 
+  min-width: 0; /* IMPRESCINDIBLE PARA TRUNCAR EL HISTORIAL */
+  display: flex;
+  flex-direction: column;
+}
+
+.h-title { 
+  display: block; 
+  font-weight: 600; 
+  font-size: 0.9rem; 
+  color: white; 
+  /* Truncamiento */
+  white-space: nowrap; 
+  overflow: hidden; 
+  text-overflow: ellipsis; 
+}
+
 .h-artist { font-size: 0.75rem; color: #999; }
-.h-check { font-size: 1rem; margin-left: 10px; }
+
+/* AQUÍ ASEGURAMOS QUE EL ICONO DEL HISTORIAL NO SE APLASTE */
+.h-check { 
+  font-size: 1rem; 
+  margin-left: 10px; 
+  flex-shrink: 0; /* PROHIBIDO ENCOGER */
+}
 
 .text-muted { color: #555; text-align: center; margin-top: 20px; font-size: 0.9rem; }
 
@@ -353,7 +416,7 @@
 @keyframes fadeInUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
 
-/* --- OVERLAY DE AUTOPLAY (SOLUCIÓN F5) --- */
+/* --- OVERLAY DE AUTOPLAY --- */
 .autoplay-overlay {
   position: fixed; top: 0; left: 0; width: 100%; height: 100%;
   background: rgba(0,0,0,0.8); z-index: 9999;

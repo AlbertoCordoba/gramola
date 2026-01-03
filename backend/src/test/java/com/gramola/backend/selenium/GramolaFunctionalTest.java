@@ -15,7 +15,9 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.time.Duration;
+import java.util.HashMap; // Import necesario
 import java.util.List;
+import java.util.Map;     // Import necesario
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -37,11 +39,26 @@ public class GramolaFunctionalTest {
         System.out.println("📂 Usando perfil persistente en: " + RUTA_PERFIL);
         
         ChromeOptions options = new ChromeOptions();
+
+        // --- BLOQUEAR GESTOR DE CONTRASEÑAS Y AVISOS DE FILTRACIÓN ---
+        Map<String, Object> prefs = new HashMap<>();
+        // Desactiva la alerta roja de "Contraseña filtrada"
+        prefs.put("profile.password_manager_leak_detection", false);
+        // Desactiva el popup de "Guardar contraseña"
+        prefs.put("credentials_enable_service", false);
+        // Desactiva el gestor de contraseñas completamente
+        prefs.put("profile.password_manager_enabled", false);
+        
+        options.setExperimentalOption("prefs", prefs);
+        
+        // Argumento extra de seguridad para evitar globos emergentes
+        options.addArguments("--disable-save-password-bubble");
+        
+        // --- CONFIGURACIÓN ESTÁNDAR ---
         options.addArguments("--remote-allow-origins=*");
         options.addArguments("--autoplay-policy=no-user-gesture-required");
         
         // --- ARREGLO DE COLORES (FORZAR MODO OSCURO) ---
-        // Esto hace que Chrome crea que tu sistema está en modo oscuro
         options.addArguments("--force-dark-mode"); 
         options.addArguments("--enable-features=WebUIDarkMode");
         
@@ -67,20 +84,14 @@ public class GramolaFunctionalTest {
         WebElement emailInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.name("email")));
         emailInput.clear();
         emailInput.sendKeys("bar@test.com"); 
-        driver.findElement(By.name("password")).sendKeys("1234");
+        driver.findElement(By.name("password")).sendKeys("123456");
         driver.findElement(By.className("btn-login")).click();
 
         // 2. LÓGICA DE SEMÁFORO (CONNECT vs BUSCADOR)
-        // Esperamos a llegar a la pantalla de configuración
         wait.until(ExpectedConditions.urlContains("config-audio"));
 
         System.out.println("🚦 Decidiendo si conectar Spotify o buscar...");
 
-        // Esta lógica es mucho más robusta:
-        // Buscamos si existe el botón de conectar. Si existe (size > 0), clicamos.
-        // Si no existe, asumimos que ya estamos conectados.
-        
-        // Damos un pequeño respiro para que Angular pinte la pantalla
         try { Thread.sleep(1500); } catch (Exception e) {}
 
         List<WebElement> botonesConectar = driver.findElements(By.cssSelector(".connect-screen .btn-primary"));
@@ -89,7 +100,6 @@ public class GramolaFunctionalTest {
             System.out.println("🔌 Botón encontrado. Pulsando CONECTAR...");
             botonesConectar.get(0).click();
 
-            // Espera de seguridad por si pide login de Spotify
             try {
                 Thread.sleep(2000);
                 if (!driver.getCurrentUrl().contains("config-audio")) {
@@ -104,10 +114,9 @@ public class GramolaFunctionalTest {
             System.out.println("✅ No hay botón de conectar. Ya estamos listos.");
         }
 
-        // 3. BUSQUEDA PLAYLIST (Ahora estamos seguros de estar conectados)
+        // 3. BUSQUEDA PLAYLIST
         System.out.println("📻 Buscando playlist real: " + busquedaPlaylist);
         
-        // Esperamos explícitamente a que el input sea VISIBLE e INTERACTUABLE
         WebElement searchInput = wait.until(ExpectedConditions.elementToBeClickable(By.cssSelector(".search-box input")));
         searchInput.clear();
         searchInput.sendKeys(busquedaPlaylist);
@@ -126,13 +135,11 @@ public class GramolaFunctionalTest {
     
     private void gestionarAudio() {
         try {
-            // Intentamos buscar el botón de activar sonido durante 3 segundos
             WebDriverWait audioWait = new WebDriverWait(driver, Duration.ofSeconds(3));
             WebElement btn = audioWait.until(ExpectedConditions.elementToBeClickable(By.cssSelector(".btn-activate")));
             btn.click();
             System.out.println("🔊 Audio activado.");
         } catch (Exception e) {
-            // Si no sale botón, hacemos click en el fondo por si acaso
             driver.findElement(By.tagName("body")).click();
         }
     }

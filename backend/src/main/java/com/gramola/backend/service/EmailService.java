@@ -144,7 +144,7 @@ public class EmailService {
                         <a href="%s" class="btn" target="_blank">%s</a>
                     </div>
                     <div class="footer">
-                        <p>© 2024 Gramola Virtual. Todos los derechos reservados.</p>
+                        <p>© 2026 Gramola Virtual. Todos los derechos reservados.</p>
                         <p>Si el botón no funciona, copia este enlace en tu navegador:<br>
                         <a href="%s" class="link-alt">%s</a></p>
                     </div>

@@ -50,9 +50,16 @@
 
       <section class="search-section">
         <div class="search-glass">
-          <span class="search-icon">🔍</span>
-          <input type="text" [(ngModel)]="busqueda" (keyup.enter)="search()" 
-                 placeholder="Añadir canción a la cola..." class="search-input">
+          
+          <span class="search-icon" *ngIf="!isSearching">🔍</span>
+          <div class="mini-spinner" *ngIf="isSearching"></div>
+
+          <input type="text" 
+                 [formControl]="searchControl" 
+                 (keyup.enter)="search()" 
+                 placeholder="Añadir canción a la cola..." 
+                 class="search-input">
+          
           <button (click)="search()" class="btn-search">Buscar</button>
         </div>
       </section>
@@ -60,7 +67,7 @@
       <div *ngIf="searchResults.length > 0" class="results-overlay fade-in-up">
         <div class="glass-header-results">
           <h3>Resultados</h3>
-          <button class="btn-close" (click)="searchResults = []">✕</button>
+          <button class="btn-close" (click)="searchResults = []; searchControl.setValue('')">✕</button>
         </div>
         <div class="results-grid">
           <div class="result-card" *ngFor="let track of searchResults" (click)="anadir(track)">

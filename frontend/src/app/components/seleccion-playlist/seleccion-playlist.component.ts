@@ -1,13 +1,16 @@
 import { Component, inject, OnInit, NgZone, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
+import { FormsModule, ReactiveFormsModule, FormControl } from '@angular/forms'; // AÑADIDO
 import { Router, ActivatedRoute } from '@angular/router';
 import { SpotifyConnectService } from '../../services/spotify.service';
+// AÑADIDO: Operadores RxJS para búsqueda en vivo
+import { debounceTime, distinctUntilChanged, filter, switchMap, tap, catchError } from 'rxjs/operators';
+import { of } from 'rxjs';
 
 @Component({
   selector: 'app-seleccion-playlist',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule], // AÑADIDO ReactiveFormsModule
   templateUrl: './seleccion-playlist.component.html',
   styleUrls: ['./seleccion-playlist.component.css']
 })
@@ -21,7 +24,9 @@ export class SeleccionPlaylistComponent implements OnInit {
   usuario: any = null;
   spotifyConnected: boolean = false;
   
-  busqueda: string = '';
+  // CAMBIO: Usamos FormControl en lugar de variable simple
+  searchControl = new FormControl('');
+  
   resultados: any[] = [];
   cargando: boolean = false;
 
@@ -41,6 +46,9 @@ export class SeleccionPlaylistComponent implements OnInit {
     } else {
       this.checkConexion();
     }
+
+    // AÑADIDO: INICIAR EL LISTENER DE BÚSQUEDA
+    this.setupLiveSearch();
   }
 
   checkConexion() {
@@ -62,78 +70,103 @@ export class SeleccionPlaylistComponent implements OnInit {
     });
   }
 
-  buscar() {
-    if (!this.busqueda || this.busqueda.trim().length === 0) return;
-    
-    this.cargando = true;
-    this.resultados = [];
-
-    // 1. DETECTAR SI ES UN ENLACE DE SPOTIFY
-    if (this.busqueda.includes('spotify.com') || this.busqueda.includes('spotify.com/playlist')) {
+  // --- NUEVA LÓGICA DE BÚSQUEDA EN VIVO ---
+  setupLiveSearch() {
+    this.searchControl.valueChanges.pipe(
+      // 1. Filtrar: Mínimo 3 caracteres para no saturar
+      filter(text => (text || '').trim().length > 2),
       
-      let playlistId = '';
-      try {
-        const partes = this.busqueda.split('playlist/');
-        if (partes.length > 1) {
-          playlistId = partes[1].split('?')[0];
-        }
-      } catch (e) {
-        console.error("Error parseando URL", e);
-      }
-
-      if (playlistId) {
-        this.spotifyService.getPlaylist(playlistId, this.usuario.id).subscribe({
-          next: (res: any) => {
-            this.ngZone.run(() => {
-              // Filtro de seguridad: solo si tiene canciones
-              if (res && res.tracks && res.tracks.total > 0) {
-                this.resultados = [res];
-              } else {
-                console.warn("La playlist del enlace está vacía");
-                this.resultados = [];
-              }
-              this.cargando = false;
-              this.cdr.detectChanges();
-            });
-          },
-          // AQUI ESTABA EL ERROR 2: Añadido ': any'
-          error: (err: any) => {
-            console.error('Error cargando playlist por link', err);
-            this.ngZone.run(() => {
-              this.cargando = false;
-              this.cdr.detectChanges();
-            });
-          }
+      // 2. Debounce: Esperar 500ms a que termines de escribir
+      debounceTime(500),
+      
+      // 3. Evitar repetidos
+      distinctUntilChanged(),
+      
+      // 4. Activar carga visual
+      tap(() => {
+        this.ngZone.run(() => {
+          this.cargando = true;
+          this.resultados = [];
+          this.cdr.detectChanges();
         });
-      } else {
+      }),
+      
+      // 5. SwitchMap: Gestiona la petición (Texto o URL)
+      switchMap(term => {
+        const busqueda = term!;
+        
+        // A) DETECTAR SI ES URL DE SPOTIFY
+        if (busqueda.includes('spotify.com') || busqueda.includes('spotify.com/playlist')) {
+          let playlistId = '';
+          try {
+            const partes = busqueda.split('playlist/');
+            if (partes.length > 1) {
+              playlistId = partes[1].split('?')[0];
+            }
+          } catch (e) { console.error("Error URL", e); }
+
+          if (playlistId) {
+            return this.spotifyService.getPlaylist(playlistId, this.usuario.id).pipe(
+              catchError(() => of(null)) // Si falla, devolvemos null para no romper el stream
+            );
+          }
+          return of(null);
+        } 
+        
+        // B) BÚSQUEDA NORMAL POR NOMBRE DE PLAYLIST
+        else {
+          return this.spotifyService.search(busqueda, this.usuario.id, 'playlist').pipe(
+            catchError(() => of(null))
+          );
+        }
+      })
+    ).subscribe({
+      next: (res: any) => {
+        this.ngZone.run(() => {
+          this.cargando = false;
+          this.procesarResultados(res);
+          this.cdr.detectChanges();
+        });
+      },
+      error: (err) => {
+        console.error("Error en live search", err);
         this.cargando = false;
       }
+    });
+  }
 
-    } else {
-      // 2. BÚSQUEDA NORMAL POR NOMBRE
-      this.spotifyService.search(this.busqueda, this.usuario.id, 'playlist').subscribe({
-        next: (res: any) => {
-          this.ngZone.run(() => {
-            const items = res.playlists?.items || [];
-            
-            // Filtro mágico para evitar playlists vacías
-            this.resultados = items.filter((p: any) => 
-              p && p.tracks && p.tracks.total > 0 && p.uri
-            );
+  // Método auxiliar para limpiar y filtrar lo que llega de la API
+  procesarResultados(res: any) {
+    if (!res) {
+      this.resultados = [];
+      return;
+    }
 
-            this.cargando = false;
-            this.cdr.detectChanges();
-          });
-        },
-        // AQUI TAMBIEN: Añadido ': any'
-        error: (err: any) => {
-          console.error('Error buscando playlists', err);
-          this.ngZone.run(() => {
-            this.cargando = false;
-            this.cdr.detectChanges();
-          });
-        }
-      });
+    // CASO A: Es una Playlist individual (por URL)
+    if (res.id && res.tracks && !res.playlists) {
+      if (res.tracks.total > 0) {
+        this.resultados = [res];
+      } else {
+        this.resultados = [];
+      }
+    }
+    // CASO B: Es un resultado de búsqueda (Array de playlists)
+    else if (res.playlists && res.playlists.items) {
+      const items = res.playlists.items || [];
+      this.resultados = items.filter((p: any) => 
+        p && p.tracks && p.tracks.total > 0 && p.uri
+      );
+    }
+    else {
+      this.resultados = [];
+    }
+  }
+
+  // Mantenemos el método manual por si el usuario pulsa Enter
+  buscar() {
+    const val = this.searchControl.value;
+    if (val && val.trim().length > 2) {
+      this.searchControl.setValue(val); // Esto dispara el pipe de arriba
     }
   }
 
