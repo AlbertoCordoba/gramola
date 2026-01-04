@@ -4,7 +4,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule, FormControl } from '@angular/forms';
 import { Title } from '@angular/platform-browser';
 import { HttpClient } from '@angular/common/http';
-// IMPORTANTE: Añadimos catchError y of para que no se rompa si hay error
 import { debounceTime, distinctUntilChanged, filter, switchMap, tap, finalize, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
 
@@ -132,7 +131,6 @@ export class Gramola implements OnInit, OnDestroy {
       this.cargarCola(); 
       this.cargarPrecioCancion();
       
-      // INICIALIZAR BÚSQUEDA EN VIVO
       this.setupLiveSearch();
 
       this.pollingInterval = setInterval(() => {
@@ -154,13 +152,14 @@ export class Gramola implements OnInit, OnDestroy {
     }
   }
 
-  // --- BÚSQUEDA EN VIVO (CORREGIDA Y ROBUSTA) ---
+  // --- BÚSQUEDA EN VIVO MEJORADA ---
   setupLiveSearch() {
     this.searchControl.valueChanges.pipe(
-      // 1. IMPORTANTE: Debes escribir al menos 3 letras
-      filter(text => (text || '').trim().length > 2),
+      // CAMBIO 1: Permitir búsqueda desde 1 carácter
+      filter(text => (text || '').trim().length > 0),
       
-      debounceTime(500),
+      // CAMBIO 2: Reducir espera a 300ms para más fluidez
+      debounceTime(300),
       distinctUntilChanged(),
       
       tap(() => {
@@ -172,15 +171,11 @@ export class Gramola implements OnInit, OnDestroy {
       
       switchMap(text => {
         return this.spotifyService.search(text!, this.usuario.id, 'track').pipe(
-          // Si falla la API, capturamos el error DENTRO del switchMap
-          // para que el listener principal NO SE ROMPA.
           catchError(err => {
             console.error('Error en búsqueda Spotify:', err);
-            return of(null); // Devolvemos observable vacío para seguir vivos
+            return of(null);
           }),
-          finalize(() => { 
-             // Finalize se ejecuta siempre tras éxito o error del switchMap
-          })
+          finalize(() => {})
         );
       })
     ).subscribe({
@@ -190,20 +185,17 @@ export class Gramola implements OnInit, OnDestroy {
           if (res && res.tracks) {
             this.searchResults = res.tracks.items || [];
           } else {
-            this.searchResults = []; // Si hubo error (res=null) limpiamos
+            this.searchResults = []; 
           }
           this.cdr.detectChanges();
         });
       },
       error: (err) => {
-        // Este error solo salta si falla algo crítico en el pipe principal
         console.error("Error crítico en buscador:", err);
         this.isSearching = false;
       }
     });
   }
-
-  // --- RESTO DE MÉTODOS IGUAL QUE ANTES ---
 
   cargarTracksDeRespaldo() {
     if (!this.playlistFondo?.id) return;
@@ -669,11 +661,11 @@ export class Gramola implements OnInit, OnDestroy {
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
 
-  // --- BÚSQUEDA MANUAL (Por si alguien da Enter) ---
+  // --- BÚSQUEDA MANUAL MEJORADA ---
   search() {
     const val = this.searchControl.value;
-    if (val && val.trim().length > 2) {
-        this.searchControl.setValue(val); // Dispara el listener del control
+    if (val && val.trim().length > 0) { // CAMBIO: Ahora permite > 0
+        this.searchControl.setValue(val);
     }
   }
 
@@ -699,7 +691,7 @@ export class Gramola implements OnInit, OnDestroy {
   onPaymentClosed(success: boolean) {
     this.showPaymentModal = false;
     if (success) {
-      this.searchControl.setValue('', { emitEvent: false }); // Limpiamos sin disparar búsqueda
+      this.searchControl.setValue('', { emitEvent: false });
       this.searchResults = [];
       this.cargarCola();
     }

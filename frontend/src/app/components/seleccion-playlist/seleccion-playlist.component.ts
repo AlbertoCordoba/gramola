@@ -1,16 +1,15 @@
 import { Component, inject, OnInit, NgZone, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule, ReactiveFormsModule, FormControl } from '@angular/forms'; // AÑADIDO
+import { FormsModule, ReactiveFormsModule, FormControl } from '@angular/forms';
 import { Router, ActivatedRoute } from '@angular/router';
 import { SpotifyConnectService } from '../../services/spotify.service';
-// AÑADIDO: Operadores RxJS para búsqueda en vivo
 import { debounceTime, distinctUntilChanged, filter, switchMap, tap, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
 
 @Component({
   selector: 'app-seleccion-playlist',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule], // AÑADIDO ReactiveFormsModule
+  imports: [CommonModule, FormsModule, ReactiveFormsModule],
   templateUrl: './seleccion-playlist.component.html',
   styleUrls: ['./seleccion-playlist.component.css']
 })
@@ -24,7 +23,6 @@ export class SeleccionPlaylistComponent implements OnInit {
   usuario: any = null;
   spotifyConnected: boolean = false;
   
-  // CAMBIO: Usamos FormControl en lugar de variable simple
   searchControl = new FormControl('');
   
   resultados: any[] = [];
@@ -47,7 +45,6 @@ export class SeleccionPlaylistComponent implements OnInit {
       this.checkConexion();
     }
 
-    // AÑADIDO: INICIAR EL LISTENER DE BÚSQUEDA
     this.setupLiveSearch();
   }
 
@@ -70,19 +67,16 @@ export class SeleccionPlaylistComponent implements OnInit {
     });
   }
 
-  // --- NUEVA LÓGICA DE BÚSQUEDA EN VIVO ---
+  // --- BÚSQUEDA EN VIVO MEJORADA ---
   setupLiveSearch() {
     this.searchControl.valueChanges.pipe(
-      // 1. Filtrar: Mínimo 3 caracteres para no saturar
-      filter(text => (text || '').trim().length > 2),
+      // CAMBIO 1: Permitir búsqueda desde 1 carácter
+      filter(text => (text || '').trim().length > 0),
       
-      // 2. Debounce: Esperar 500ms a que termines de escribir
-      debounceTime(500),
-      
-      // 3. Evitar repetidos
+      // CAMBIO 2: Debounce de 300ms
+      debounceTime(300),
       distinctUntilChanged(),
       
-      // 4. Activar carga visual
       tap(() => {
         this.ngZone.run(() => {
           this.cargando = true;
@@ -91,11 +85,10 @@ export class SeleccionPlaylistComponent implements OnInit {
         });
       }),
       
-      // 5. SwitchMap: Gestiona la petición (Texto o URL)
       switchMap(term => {
         const busqueda = term!;
         
-        // A) DETECTAR SI ES URL DE SPOTIFY
+        // A) URL de Spotify
         if (busqueda.includes('spotify.com') || busqueda.includes('spotify.com/playlist')) {
           let playlistId = '';
           try {
@@ -107,13 +100,13 @@ export class SeleccionPlaylistComponent implements OnInit {
 
           if (playlistId) {
             return this.spotifyService.getPlaylist(playlistId, this.usuario.id).pipe(
-              catchError(() => of(null)) // Si falla, devolvemos null para no romper el stream
+              catchError(() => of(null))
             );
           }
           return of(null);
         } 
         
-        // B) BÚSQUEDA NORMAL POR NOMBRE DE PLAYLIST
+        // B) Búsqueda normal
         else {
           return this.spotifyService.search(busqueda, this.usuario.id, 'playlist').pipe(
             catchError(() => of(null))
@@ -135,14 +128,12 @@ export class SeleccionPlaylistComponent implements OnInit {
     });
   }
 
-  // Método auxiliar para limpiar y filtrar lo que llega de la API
   procesarResultados(res: any) {
     if (!res) {
       this.resultados = [];
       return;
     }
 
-    // CASO A: Es una Playlist individual (por URL)
     if (res.id && res.tracks && !res.playlists) {
       if (res.tracks.total > 0) {
         this.resultados = [res];
@@ -150,7 +141,6 @@ export class SeleccionPlaylistComponent implements OnInit {
         this.resultados = [];
       }
     }
-    // CASO B: Es un resultado de búsqueda (Array de playlists)
     else if (res.playlists && res.playlists.items) {
       const items = res.playlists.items || [];
       this.resultados = items.filter((p: any) => 
@@ -162,11 +152,10 @@ export class SeleccionPlaylistComponent implements OnInit {
     }
   }
 
-  // Mantenemos el método manual por si el usuario pulsa Enter
   buscar() {
     const val = this.searchControl.value;
-    if (val && val.trim().length > 2) {
-      this.searchControl.setValue(val); // Esto dispara el pipe de arriba
+    if (val && val.trim().length > 0) { // CAMBIO: > 0
+      this.searchControl.setValue(val);
     }
   }
 
