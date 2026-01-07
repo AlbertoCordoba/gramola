@@ -1,63 +1,84 @@
-/* --- VARIABLES GLOBALES & RESET --- */
+/*
+ * ======================================================================================
+ * HOJA DE ESTILOS DEL COMPONENTE RAÍZ
+ * ======================================================================================
+ */
+
+/* --- VARIABLES CSS (:root) --- 
+   Permiten cambiar el tema de color en un solo sitio y que se replique en toda la app.
+*/
 :root {
-  --primary: #1ed760;
-  --primary-dark: #169c46;
-  --bg-color: #121212;
-  --glass-bg: rgba(255, 255, 255, 0.05);
-  --border-glass: rgba(255, 255, 255, 0.1);
+  --primary: #1ed760;       /* Verde Spotify */
+  --primary-dark: #169c46;  /* Verde oscuro para hovers */
+  --bg-color: #121212;      /* Fondo casi negro */
+  --glass-bg: rgba(255, 255, 255, 0.05); /* Fondo semitransparente para cristales */
+  --border-glass: rgba(255, 255, 255, 0.1); /* Bordes sutiles */
   --text-main: #ffffff;
-  --text-sec: #b3b3b3;
+  --text-sec: #b3b3b3;      /* Texto gris secundario */
 }
 
+/* --- ESTILOS GLOBALES --- */
 body, html {
   height: 100%; margin: 0;
   background-color: var(--bg-color);
+  /* Degradado radial sutil para que el fondo no sea plano aburrido */
   background-image: radial-gradient(circle at 50% -20%, #2a2a2a, #121212);
   color: var(--text-main);
   font-family: 'Segoe UI', sans-serif;
-  overflow-x: hidden;
+  overflow-x: hidden; /* Evita scroll lateral indeseado */
 }
 
-/* --- LAYOUT PRINCIPAL --- */
+/* --- LAYOUT FLEXBOX (Sticky Footer technique) --- 
+   Asegura que el footer (si hubiera) siempre quede abajo, incluso con poco contenido.
+*/
 .app-layout {
   display: flex; flex-direction: column; min-height: 100vh;
 }
 
+/* El área de contenido ocupa todo el espacio restante */
 .content-area {
-  flex: 1; position: relative;
-  /* El padding-top compensa la altura del header fixed */
+  flex: 1; 
+  position: relative;
+  /* IMPORTANTE: Padding superior de 90px para compensar el header fijo, 
+     si no, el contenido quedaría oculto debajo de la barra */
   padding-top: 90px; 
 }
 
-/* --- HEADER GLOBAL --- */
+/* --- HEADER DE CRISTAL (Glassmorphism) --- */
 .glass-header {
   display: flex; justify-content: space-between; align-items: center;
   padding: 0 2rem; height: 90px;
+  
+  /* Efecto de vidrio esmerilado */
   background: rgba(12, 12, 12, 0.95);
-  backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px); /* Difumina lo que pasa por detrás al hacer scroll */
   border-bottom: 1px solid var(--border-glass);
+  
+  /* Fijado arriba */
   position: fixed; top: 0; width: 100%; z-index: 1000; box-sizing: border-box;
 }
 
+/* Alineación de elementos del header */
 .header-left { flex: 1; display: flex; align-items: center; }
-.header-left.centered { justify-content: center; } /* Para el Login */
+.header-left.centered { justify-content: center; } /* Se aplica en Login para centrar logo */
 
+/* --- MARCA / LOGOTIPO --- */
 .brand { display: flex; align-items: center; gap: 15px; cursor: pointer; text-decoration: none; color: white; }
 .logo-circle { 
   width: 45px; height: 45px; background: var(--primary); 
   border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+  /* Resplandor verde */
   box-shadow: 0 0 20px rgba(30, 215, 96, 0.3);
 }
 .brand h1 { font-size: 1.6rem; margin: 0; font-weight: 800; letter-spacing: -1px; }
 .highlight { color: var(--primary); }
 
-/* Perfil Usuario */
+/* --- PERFIL DE USUARIO (DERECHA) --- */
 .header-right { flex: 1; display: flex; justify-content: flex-end; }
 
 .profile-card {
   display: flex; align-items: center;
-  /* AUMENTADO EL GAP PARA QUE NO SE VEA PEGADO */
-  gap: 25px; 
+  gap: 25px; /* Espacio entre info, firma y botón */
   background: rgba(255, 255, 255, 0.03);
   padding: 8px 15px 8px 25px; border-radius: 50px;
   border: 1px solid var(--border-glass);
@@ -69,22 +90,24 @@ body, html {
 
 .separator { width: 1px; height: 30px; background: rgba(255,255,255,0.1); }
 
+/* Caja de la firma digital */
 .firma-box {
   background: white; padding: 4px 8px; border-radius: 6px;
   height: 36px; display: flex; align-items: center;
 }
 .img-firma { height: 28px; width: auto; }
 
+/* Botón Logout circular */
 .btn-logout {
   width: 32px; height: 32px; border-radius: 50%;
-  background: rgba(255, 87, 87, 0.15); color: #ff6b6b;
+  background: rgba(255, 87, 87, 0.15); color: #ff6b6b; /* Rojo suave */
   border: 1px solid rgba(255, 87, 87, 0.3);
   cursor: pointer; display: flex; align-items: center; justify-content: center;
   font-weight: bold; transition: 0.2s;
 }
 .btn-logout:hover { background: #ff6b6b; color: white; transform: scale(1.1); }
 
-/* --- UTILIDADES DE NAVEGACIÓN (Links bonitos) --- */
+/* --- LINKS AUXILIARES --- */
 .nav-link {
   color: var(--primary); text-decoration: none; font-weight: bold;
   border-bottom: 1px dashed var(--primary); padding-bottom: 2px;
@@ -94,8 +117,9 @@ body, html {
 
 .text-sec { color: var(--text-sec); font-size: 0.95rem; margin-top: 20px; }
 
-/* Responsive */
+/* --- RESPONSIVE (MÓVIL) --- */
 @media (max-width: 600px) {
+  /* En móviles ocultamos el nombre y el rol para ahorrar espacio, dejando solo el botón salir */
   .user-name, .role-badge, .separator { display: none; }
   .profile-card { gap: 10px; padding: 5px; background: transparent; border: none; }
 }

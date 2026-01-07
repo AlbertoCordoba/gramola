@@ -1,3 +1,28 @@
+/*
+ * ======================================================================================
+ * RESUMEN
+ * ======================================================================================
+ * * ¿QUÉ ES ESTA CLASE?
+ * Es la pantalla de selección de suscripciones ('PagosComponent').
+ * Permite al dueño del bar elegir entre pagar mensual o anualmente para activar su cuenta.
+ *
+ * * PUNTOS CLAVE:
+ * 1. PRECIOS DINÁMICOS (Backend Driven):
+ * Los precios NO están escritos en el código ("50€"). Se cargan desde la base de datos
+ * a través de una petición HTTP al Backend ('/api/bares/precios').
+ * Esto permite al administrador del negocio cambiar tarifas sin redesplegar la app.
+ *
+ * 2. GESTIÓN DE ESTADO ENTRE PÁGINAS (PagoStateService):
+ * Cuando el usuario elige un plan, no pasamos los datos por la URL (inseguro y feo).
+ * Usamos un servicio compartido ('PagoStateService') para guardar temporalmente la
+ * intención de compra antes de navegar a la pasarela de pago.
+ *
+ * 3. LECTURA DE PARÁMETROS (ActivatedRoute):
+ * Detectamos si el usuario viene rebotado de la verificación de email (param '?verificado=true')
+ * para mostrar feedback o activar lógicas específicas.
+ * ======================================================================================
+ */
+
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';
@@ -8,34 +33,44 @@ import { PagoStateService } from '../../services/pago-state.service';
 @Component({
   selector: 'app-pagos',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule], // FormsModule necesario para el [(ngModel)] del email
   templateUrl: './pagos.component.html',
   styleUrl: './pagos.component.css'
 })
 export class PagosComponent implements OnInit {
+  // --- INYECCIÓN DE DEPENDENCIAS ---
   private http = inject(HttpClient);
   private router = inject(Router);
-  private route = inject(ActivatedRoute);
-  // Inyectamos el servicio de estado
-  private pagoState = inject(PagoStateService);
+  private route = inject(ActivatedRoute); // Para leer parámetros de la URL (?verificado=true)
+  private pagoState = inject(PagoStateService); // Servicio puente para pasar datos a la pasarela
   
+  // Variables de estado
   precios: any = {};
   emailUsuario: string = '';
-  cargando: boolean = true;
+  cargando: boolean = true; // Controla el spinner de carga inicial
   errorMensaje: string = '';
 
   ngOnInit() {
+    // 1. Detección de retorno de verificación
+    // Si la URL es /pagos?verificado=true, sabemos que acaba de confirmar su email
     this.route.queryParams.subscribe(params => {
       if (params['verificado']) {
-        console.log("Usuario verificado.");
+        console.log("Usuario verificado correctamente.");
+        // Aquí podríamos mostrar un toast/notificación de "Email verificado"
       }
     });
+
+    // 2. Carga de datos
     this.cargarPrecios();
   }
 
   cargarPrecios() {
+    // Llamada GET al backend para obtener la configuración de precios actualizada
     this.http.get('http://localhost:8080/api/bares/precios').subscribe({
       next: (res: any) => {
+        // --- NORMALIZACIÓN DE DATOS ---
+        // Convertimos las claves a mayúsculas y quitamos espacios para evitar errores humanos
+        // al acceder a precios['SUSCRIPCION_MENSUAL'] si en BD viene como 'suscripcion_mensual '.
         const preciosNormalizados: any = {};
         for (const key in res) {
             if (res[key]) {
@@ -44,39 +79,44 @@ export class PagosComponent implements OnInit {
         }
         this.precios = preciosNormalizados;
 
+        // Validación básica para asegurar que la UI no se rompa
         if (this.precios['SUSCRIPCION_MENSUAL']) {
             this.cargando = false;
         } else {
             this.cargando = false;
-            this.errorMensaje = "No se encontraron los precios.";
+            this.errorMensaje = "No se encontraron los precios en la base de datos.";
         }
       },
       error: (err) => {
         console.error(err);
         this.cargando = false;
-        this.errorMensaje = "Error conectando con el servidor.";
+        this.errorMensaje = "Error conectando con el servidor. Intenta más tarde.";
       }
     });
   }
 
+  // Método invocado al hacer clic en "Elegir Plan"
   pagar(tipo: string) {
+    // Validación simple del campo email
     if (!this.emailUsuario) {
       alert('Introduce tu email para continuar.');
       return;
     }
 
-    // Configurar los datos para la pasarela
+    // --- GUARDADO DE ESTADO (State Management) ---
+    // En lugar de pasar precio y concepto por URL (que se puede manipular),
+    // lo guardamos en un servicio singleton en memoria.
     this.pagoState.setPago({
       concepto: tipo === 'SUSCRIPCION_MENSUAL' ? 'Suscripción Mensual' : 'Suscripción Anual',
-      precio: this.precios[tipo],
+      precio: this.precios[tipo], // Usamos el precio real cargado del servidor
       tipo: 'SUSCRIPCION',
       payload: {
-        email: this.emailUsuario,
+        email: this.emailUsuario, // Identificador para activar al usuario en BD
         tipo: tipo
       }
     });
 
-    // Redirigir a la pantalla de pago
+    // Navegación limpia a la pantalla de la tarjeta de crédito
     this.router.navigate(['/pasarela']);
   }
 }

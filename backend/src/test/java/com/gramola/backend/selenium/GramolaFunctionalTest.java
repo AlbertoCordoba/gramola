@@ -1,3 +1,27 @@
+/*
+ * ======================================================================================
+ * RESUMEN
+ * ======================================================================================
+ * * ¿QUÉ ES ESTA CLASE?
+ * Es una suite de pruebas funcionales "End-to-End" (E2E) automatizadas con Selenium.
+ * Simula el comportamiento de un usuario real navegando por la aplicación en Chrome.
+ *
+ * * PUNTOS CLAVE:
+ * 1. SIMULACIÓN REALISTA:
+ * No probamos código aislado, probamos la EXPERIENCIA. El test abre un navegador,
+ * inicia sesión, busca canciones, paga y verifica que la música suena.
+ *
+ * 2. PERFIL PERSISTENTE DE CHROME:
+ * Usamos un perfil de usuario temporal ('RUTA_PERFIL') para evitar problemas con
+ * sesiones bloqueadas, popups de "guardar contraseña" o configuraciones del navegador
+ * del desarrollador. Esto hace que el test sea estable y reproducible.
+ *
+ * 3. CASOS DE PRUEBA (Happy Path & Error Path):
+ * - 'testFlujoRealFernando_Costa': Prueba el camino feliz (todo funciona, pago OK).
+ * - 'testPagoConDatosIncorrectos': Prueba la robustez (el sistema rechaza pagos malos).
+ * ======================================================================================
+ */
+
 package com.gramola.backend.selenium;
 
 import io.github.bonigarcia.wdm.WebDriverManager;
@@ -15,9 +39,9 @@ import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
 import java.time.Duration;
-import java.util.HashMap; // Import necesario
+import java.util.HashMap; 
 import java.util.List;
-import java.util.Map;     // Import necesario
+import java.util.Map;     
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -26,11 +50,12 @@ public class GramolaFunctionalTest {
     private WebDriver driver;
     private WebDriverWait wait;
     
-    // Carpeta segura para guardar tu sesión
+    // Definimos una carpeta específica para guardar la sesión del navegador de pruebas
     private static final String RUTA_PERFIL = System.getProperty("user.home") + "/selenium-chrome-profile";
 
     @BeforeAll
     public static void setupClass() {
+        // WebDriverManager descarga automáticamente el driver de Chrome compatible
         WebDriverManager.chromedriver().setup();
     }
 
@@ -40,29 +65,23 @@ public class GramolaFunctionalTest {
         
         ChromeOptions options = new ChromeOptions();
 
-        // --- BLOQUEAR GESTOR DE CONTRASEÑAS Y AVISOS DE FILTRACIÓN ---
+        // --- BLOQUEAR GESTOR DE CONTRASEÑAS Y AVISOS ---
+        // Vital para evitar que popups de Chrome rompan la automatización
         Map<String, Object> prefs = new HashMap<>();
-        // Desactiva la alerta roja de "Contraseña filtrada"
         prefs.put("profile.password_manager_leak_detection", false);
-        // Desactiva el popup de "Guardar contraseña"
         prefs.put("credentials_enable_service", false);
-        // Desactiva el gestor de contraseñas completamente
         prefs.put("profile.password_manager_enabled", false);
-        
         options.setExperimentalOption("prefs", prefs);
         
-        // Argumento extra de seguridad para evitar globos emergentes
         options.addArguments("--disable-save-password-bubble");
-        
-        // --- CONFIGURACIÓN ESTÁNDAR ---
         options.addArguments("--remote-allow-origins=*");
+        // Política para permitir autoreproducción de audio sin interacción
         options.addArguments("--autoplay-policy=no-user-gesture-required");
         
-        // --- ARREGLO DE COLORES (FORZAR MODO OSCURO) ---
+        // Forzar modo oscuro para consistencia visual
         options.addArguments("--force-dark-mode"); 
         options.addArguments("--enable-features=WebUIDarkMode");
         
-        // --- ARREGLO DE SESIÓN ---
         options.addArguments("user-data-dir=" + RUTA_PERFIL);
         options.addArguments("--profile-directory=Default"); 
 
@@ -71,15 +90,17 @@ public class GramolaFunctionalTest {
         driver.manage().window().maximize();
     }
 
+    // --- MÉTODO REUTILIZABLE: PREPARAR LA SESIÓN ---
+    // Encapsula el Login, la conexión con Spotify y la selección de ambiente
     private void prepararEntornoGramola(String busquedaPlaylist) {
-        // 1. FORZAR LOGIN SIEMPRE
+        // 1. Limpieza de sesión
         driver.get("http://localhost:4200/login");
-        
         JavascriptExecutor js = (JavascriptExecutor) driver;
         js.executeScript("window.localStorage.clear();");
         js.executeScript("window.sessionStorage.clear();");
         driver.navigate().refresh();
 
+        // 2. Login Automático
         System.out.println("🔒 Escribiendo credenciales en Gramola...");
         WebElement emailInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.name("email")));
         emailInput.clear();
@@ -87,9 +108,8 @@ public class GramolaFunctionalTest {
         driver.findElement(By.name("password")).sendKeys("123456");
         driver.findElement(By.className("btn-login")).click();
 
-        // 2. LÓGICA DE SEMÁFORO (CONNECT vs BUSCADOR)
+        // 3. Gestión inteligente de Spotify (¿Ya conectado o necesita login?)
         wait.until(ExpectedConditions.urlContains("config-audio"));
-
         System.out.println("🚦 Decidiendo si conectar Spotify o buscar...");
 
         try { Thread.sleep(1500); } catch (Exception e) {}
@@ -99,7 +119,7 @@ public class GramolaFunctionalTest {
         if (!botonesConectar.isEmpty() && botonesConectar.get(0).isDisplayed()) {
             System.out.println("🔌 Botón encontrado. Pulsando CONECTAR...");
             botonesConectar.get(0).click();
-
+            // Lógica de espera por si Spotify pide login manual (damos 3 minutos)
             try {
                 Thread.sleep(2000);
                 if (!driver.getCurrentUrl().contains("config-audio")) {
@@ -109,14 +129,12 @@ public class GramolaFunctionalTest {
                     System.out.println("✅ Login completado.");
                 }
             } catch (Exception e) {}
-            
         } else {
             System.out.println("✅ No hay botón de conectar. Ya estamos listos.");
         }
 
-        // 3. BUSQUEDA PLAYLIST
+        // 4. Selección de Playlist de Ambiente
         System.out.println("📻 Buscando playlist real: " + busquedaPlaylist);
-        
         WebElement searchInput = wait.until(ExpectedConditions.elementToBeClickable(By.cssSelector(".search-box input")));
         searchInput.clear();
         searchInput.sendKeys(busquedaPlaylist);
@@ -128,11 +146,12 @@ public class GramolaFunctionalTest {
 
         wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-select"))).click();
 
-        // 4. ENTRADA A GRAMOLA
+        // 5. Entrada al Dashboard
         wait.until(ExpectedConditions.urlContains("/gramola"));
         gestionarAudio();
     }
     
+    // Intenta activar el audio si el navegador lo bloquea
     private void gestionarAudio() {
         try {
             WebDriverWait audioWait = new WebDriverWait(driver, Duration.ofSeconds(3));
@@ -140,25 +159,30 @@ public class GramolaFunctionalTest {
             btn.click();
             System.out.println("🔊 Audio activado.");
         } catch (Exception e) {
+            // Si no aparece el botón, hacemos un clic genérico para despertar el audio context
             driver.findElement(By.tagName("body")).click();
         }
     }
 
+    // --- TEST 1: FLUJO COMPLETO DE ÉXITO ---
     @Test
     public void testFlujoRealFernando_Costa() {
         prepararEntornoGramola("Fernando Costa");
 
+        // Buscar canción
         WebElement searchInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".search-input")));
         searchInput.clear();
         searchInput.sendKeys("Malamanera");
         
         wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-search"))).click();
 
+        // Seleccionar canción
         WebElement resultsOverlay = wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-overlay")));
         try { Thread.sleep(1000); } catch (Exception e) {} 
         
         wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-add"))).click();
 
+        // Rellenar Pago (Datos CORRECTOS)
         WebElement modalPago = wait.until(ExpectedConditions.visibilityOfElementLocated(By.tagName("app-pasarela-pago")));
         modalPago.findElement(By.cssSelector("input[placeholder='NOMBRE APELLIDOS']")).sendKeys("Tester Pro");
         modalPago.findElement(By.cssSelector("input[placeholder='0000 0000 0000 0000']")).sendKeys("1234567812345678");
@@ -167,6 +191,7 @@ public class GramolaFunctionalTest {
         
         wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-pay"))).click();
 
+        // Verificación de Éxito
         WebElement successView = wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("success-view")));
         assertTrue(successView.isDisplayed());
         
@@ -174,23 +199,30 @@ public class GramolaFunctionalTest {
         try { Thread.sleep(60000); } catch (InterruptedException e) {}
     }
 
+    // --- TEST 2: PRUEBA DE ERROR (Pago fallido) ---
     @Test
     public void testPagoConDatosIncorrectos() {
         prepararEntornoGramola("Rock FM");
 
+        // Buscar canción
         WebElement searchInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".search-input")));
         searchInput.clear();
         searchInput.sendKeys("Bohemian Rhapsody");
         wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-search"))).click();
 
+        // Seleccionar canción
         WebElement resultsOverlay = wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-overlay")));
         try { Thread.sleep(1000); } catch (Exception e) {} 
         wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-add"))).click();
 
+        // Rellenar Pago (Datos INCORRECTOS - Tarjeta incompleta)
         WebElement modalPago = wait.until(ExpectedConditions.visibilityOfElementLocated(By.tagName("app-pasarela-pago")));
         modalPago.findElement(By.cssSelector("input[placeholder='0000 0000 0000 0000']")).sendKeys("123"); 
+        
+        // Intentar pagar
         wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-pay"))).click();
 
+        // Verificación: NO debe salir la pantalla de éxito
         boolean exitoVisible = false;
         try {
             WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(3));
@@ -198,7 +230,7 @@ public class GramolaFunctionalTest {
             exitoVisible = true;
         } catch (Exception e) {}
 
-        if (!exitoVisible) System.out.println("✅ Test Error OK.");
+        if (!exitoVisible) System.out.println("✅ Test Error OK: El pago no procedió con datos malos.");
         else throw new RuntimeException("❌ Fallo: Pago incorrecto permitido.");
     }
 

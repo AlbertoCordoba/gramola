@@ -1,3 +1,28 @@
+/*
+ * ======================================================================================
+ * RESUMEN
+ * ======================================================================================
+ * * ¿QUÉ ES ESTA CLASE?
+ * 'EmailService' centraliza todas las notificaciones por correo electrónico de la app.
+ * Su función es mantener al usuario informado en momentos críticos (registro y seguridad).
+ *
+ * * PUNTOS CLAVE:
+ * 1. INYECCIÓN DE DEPENDENCIAS (JavaMailSender):
+ * Usamos la librería estándar 'spring-boot-starter-mail' para abstraernos de la
+ * complejidad del protocolo SMTP. Configuramos el servidor (Mailtrap en desarrollo)
+ * en el archivo 'application.properties'.
+ *
+ * 2. HTML ENRIQUECIDO (Text Blocks):
+ * En lugar de enviar texto plano feo, enviamos correos HTML profesionales con estilos
+ * CSS integrados. Usamos la característica "Text Blocks" de Java 17 (""") para
+ * escribir el HTML de forma limpia y legible dentro del código Java.
+ *
+ * 3. CASOS DE USO:
+ * - Bienvenida: Envía el enlace de verificación de cuenta.
+ * - Seguridad: Envía el enlace temporal para restablecer la contraseña.
+ * ======================================================================================
+ */
+
 package com.gramola.backend.service;
 
 import jakarta.mail.MessagingException;
@@ -11,10 +36,12 @@ import org.springframework.stereotype.Service;
 public class EmailService {
 
     @Autowired
-    private JavaMailSender mailSender;
+    private JavaMailSender mailSender; // El "cartero" que nos da Spring Boot.
 
+    // --- CORREO DE BIENVENIDA ---
     public void sendWelcomeEmail(String to, String token) {
         String subject = "Bienvenido a la fiesta - Gramola Virtual";
+        // Construimos la URL única con el token para que el usuario haga clic
         String confirmationUrl = "http://localhost:8080/api/bares/verificar?token=" + token;
 
         String htmlContent = createHtmlTemplate(
@@ -27,8 +54,10 @@ public class EmailService {
         sendHtmlEmail(to, subject, htmlContent);
     }
 
+    // --- CORREO DE RECUPERACIÓN ---
     public void sendPasswordRecoveryEmail(String to, String token) {
         String subject = "Recupera tu acceso 🔐";
+        // Esta URL apunta al Frontend (Angular) para mostrar el formulario de nueva contraseña
         String resetUrl = "http://localhost:4200/reset-password?token=" + token;
 
         String htmlContent = createHtmlTemplate(
@@ -41,6 +70,7 @@ public class EmailService {
         sendHtmlEmail(to, subject, htmlContent);
     }
 
+    // --- MÉTODO PRIVADO DE ENVÍO ---
     private void sendHtmlEmail(String to, String subject, String htmlContent) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -50,10 +80,11 @@ public class EmailService {
             helper.setTo(to);
             helper.setSubject(subject);
             helper.setFrom("Gramola Virtual <no-reply@gramolavirtual.com>");
-            helper.setText(htmlContent, true); // true indica que es HTML
+            helper.setText(htmlContent, true); // true indica que es HTML, para que lo renderice bien
 
             mailSender.send(message);
         } catch (MessagingException e) {
+            // Logueamos el error pero no rompemos la ejecución principal
             System.err.println("Error enviando email: " + e.getMessage());
         }
     }
@@ -151,6 +182,6 @@ public class EmailService {
                 </div>
             </body>
             </html>
-            """.formatted(title, bodyText, btnUrl, btnText, btnUrl, btnUrl);
+            """.formatted(title, bodyText, btnUrl, btnText, btnUrl, btnUrl); // .formatted() rellena los %s dinámicamente
     }
 }
