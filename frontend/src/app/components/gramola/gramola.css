@@ -434,7 +434,39 @@
   font-size: 1.1rem; cursor: pointer; margin-top: 20px;
 }
 .btn-activate:hover { transform: scale(1.05); background: #1fdf64; }
+/* =========================================
+   MODAL DE PAGO (Ventana Emergente)
+   ========================================= */
+.modal-backdrop {
+  position: fixed;   /* CLAVE: Lo saca del flujo normal */
+  top: 0; 
+  left: 0; 
+  width: 100%; 
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.85); /* Fondo negro oscuro */
+  display: flex; 
+  justify-content: center; 
+  align-items: center;
+  z-index: 5000;     /* Muy alto para estar encima de todo */
+  backdrop-filter: blur(5px);
+  animation: fadeIn 0.3s ease-out;
+}
 
+.modal-content {
+  background: transparent;
+  border: none;
+  width: auto;
+  max-width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  animation: scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+/* Animación de entrada tipo "Pop" */
+@keyframes scaleUp {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
 /* Responsive */
 @media (max-width: 850px) {
   .lists-layout { grid-template-columns: 1fr; }

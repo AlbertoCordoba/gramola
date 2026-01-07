@@ -135,6 +135,13 @@
     </div>
   </main>
 
-  <app-pasarela-pago *ngIf="showPaymentModal" [isModal]="true" (close)="onPaymentClosed($event)"></app-pasarela-pago>
+  <div class="modal-backdrop" *ngIf="showPaymentModal">
+    <div class="modal-content">
+      <app-pasarela-pago 
+          [isModal]="true" 
+          (close)="onPaymentClosed($event)">
+      </app-pasarela-pago>
+    </div>
+  </div>
 
 </div>

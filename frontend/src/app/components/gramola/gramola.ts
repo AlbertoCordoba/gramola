@@ -165,6 +165,8 @@ export class Gramola implements OnInit, OnDestroy {
     if (this.usuario) {
       this.initSpotifySDK(); // Inyectamos el script del reproductor
       this.cargarCola();     // Petición inicial de datos al backend
+      
+      // CAMBIO 1: Cargar el precio
       this.cargarPrecioCancion();
       
       this.setupLiveSearch(); // Configuramos el pipeline de búsqueda reactiva
@@ -398,11 +400,13 @@ export class Gramola implements OnInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
+  // CAMBIO 2: Usamos HttpClient directo para asegurar que encontramos el endpoint
   cargarPrecioCancion() {
-    this.gramolaService.obtenerConfiguracionPrecios().subscribe({
+    this.http.get<any>('http://localhost:8080/api/bares/precios').subscribe({
       next: (precios: any) => {
         if (precios && precios['PRECIO_CANCION']) {
           this.precioCancion = precios['PRECIO_CANCION'];
+          console.log('✅ Precio actualizado:', this.precioCancion);
         }
       },
       error: (e) => console.error('Error cargando precio', e)
@@ -783,12 +787,19 @@ export class Gramola implements OnInit, OnDestroy {
     }
   }
 
+  // CAMBIO 3: Validación del precio y preparación del pago dinámico
   anadir(track: any) {
+    // Seguridad: Si no tenemos precio, no dejamos comprar
+    if (this.precioCancion <= 0) {
+        alert("El sistema de precios no está disponible. Recarga la página.");
+        return;
+    }
+
     const previewUrl = track.preview_url || track.previewUrl || '';
     // Preparamos transacción
     this.pagoState.setPago({
       concepto: `Canción: ${track.name}`,
-      precio: this.precioCancion,
+      precio: this.precioCancion, // PRECIO DINÁMICO DE BD
       tipo: 'CANCION',
       payload: {
         barId: Number(this.usuario.id),
