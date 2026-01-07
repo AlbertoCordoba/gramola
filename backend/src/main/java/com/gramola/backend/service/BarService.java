@@ -8,6 +8,7 @@ import com.gramola.backend.model.Pagos;
 import com.gramola.backend.repository.BarRepository;
 import com.gramola.backend.repository.ConfiguracionPreciosRepository;
 import com.gramola.backend.repository.PagosRepository;
+import com.gramola.backend.util.SimetricCipher; // Importamos nuestra utilidad
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -36,7 +37,6 @@ public class BarService {
     @Autowired
     private PagosRepository pagosRepository;
     
-    // Herramienta estándar de seguridad para encriptar claves
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
 
     public Map<String, BigDecimal> obtenerPrecios() {
@@ -57,17 +57,22 @@ public class BarService {
         bar.setNombre(datos.getNombre());
         bar.setEmail(datos.getEmail());
         
-        // ENCRIPTACIÓN: Clave del éxito en seguridad
+        // --- NUEVO: Guardar credenciales de Spotify ---
+        bar.setClientId(datos.getClientId());
+        
+        // IMPORTANTE: Ciframos el secreto antes de guardarlo en BD
+        String secretoCifrado = SimetricCipher.encrypt(datos.getClientSecret());
+        bar.setClientSecret(secretoCifrado);
+        // ---------------------------------------------
+        
         String passwordEncriptada = passwordEncoder.encode(datos.getPassword());
         bar.setPassword(passwordEncriptada); 
         
         bar.setLatitud(datos.getLatitud());
         bar.setLongitud(datos.getLongitud());
         
-        // DECODIFICACIÓN DE IMAGEN: Transformamos el String Base64 del Canvas HTML a Bytes
         if (datos.getFirmaBase64() != null && !datos.getFirmaBase64().isEmpty()) {
             try {
-                // Quitamos la cabecera "data:image/png;base64," para quedarnos con los datos puros
                 String base64Image = datos.getFirmaBase64().split(",")[1];
                 byte[] imageBytes = Base64.getDecoder().decode(base64Image);
                 bar.setFirmaImagen(imageBytes);
@@ -76,14 +81,12 @@ public class BarService {
             }
         }
         
-        // Generamos token para validar el email
         String token = UUID.randomUUID().toString();
         bar.setTokenConfirmacion(token);
-        bar.setActivo(false); // Inactivo por defecto hasta que pague y confirme
+        bar.setActivo(false);
 
         barRepository.save(bar);
         
-        // Enviamos el correo asíncronamente (delegado en EmailService)
         emailService.sendWelcomeEmail(bar.getEmail(), token);
     }
 
@@ -94,30 +97,23 @@ public class BarService {
         barRepository.save(bar);
     }
 
-    // --- LOGIN Y GEOLOCALIZACIÓN ---
     public Bar login(BarLoginDTO datos) throws Exception {
             Bar bar = barRepository.findByEmail(datos.getEmail())
                     .orElseThrow(() -> new Exception("Usuario no encontrado"));
 
-            // Comprobamos la contraseña hasheada
             if (!passwordEncoder.matches(datos.getPassword(), bar.getPassword())) {
                 throw new Exception("Contraseña incorrecta");
             }
             
-            // Validaciones de estado de cuenta
             if (bar.getTokenConfirmacion() != null) throw new Exception("Confirma tu email primero.");
             if (!bar.isActivo()) throw new Exception("Completa el pago de suscripción.");
             
-            // --- CONTROL GPS (Anti-Fraude) ---
             if (datos.getLat() == null || datos.getLng() == null) {
                 throw new Exception("⚠️ Ubicación obligatoria. Activa el GPS para entrar.");
             }
             
-            // Calculamos si el usuario está físicamente cerca del bar
             if (bar.getLatitud() != null && bar.getLongitud() != null) {
                 double distancia = calcularDistancia(datos.getLat(), datos.getLng(), bar.getLatitud(), bar.getLongitud());
-                
-                // Límite de 100 metros
                 if (distancia > 100) {
                     throw new Exception("⛔ Acceso denegado: Estás a " + (int)distancia + "m del bar (Máx 100m).");
                 }
@@ -126,16 +122,15 @@ public class BarService {
             return bar;
         }
 
-    // FÓRMULA DEL HAVERSINE: Matemática para calcular distancia entre dos puntos en una esfera (La Tierra)
     private double calcularDistancia(double lat1, double lon1, double lat2, double lon2) {
-        final int R = 6371; // Radio de la Tierra en km
+        final int R = 6371; 
         double latDistance = Math.toRadians(lat2 - lat1);
         double lonDistance = Math.toRadians(lon2 - lon1);
         double a = Math.sin(latDistance / 2) * Math.sin(latDistance / 2)
                 + Math.cos(Math.toRadians(lat1)) * Math.cos(Math.toRadians(lat2))
                 * Math.sin(lonDistance / 2) * Math.sin(lonDistance / 2);
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        return (R * c) * 1000; // Convertimos a metros
+        return (R * c) * 1000; 
     }
 
     public void solicitarRecuperacion(String email) throws Exception {
@@ -161,22 +156,14 @@ public class BarService {
         barRepository.save(bar);
     }
 
-    // --- SUSCRIPCIONES Y PAGOS ---
-    // NOTA: 'simularError' ya no se usa porque el pago real se hace en el frontend con Stripe,
-    // pero mantenemos el parámetro para no romper el BarController si no se ha actualizado.
     public void activarSuscripcion(String email, String tipo, boolean simularError) throws Exception {
         Bar bar = barRepository.findByEmail(email)
                 .orElseThrow(() -> new Exception("Usuario no encontrado"));
-        
-        // --- CAMBIO PARA STRIPE ---
-        // Eliminamos la llamada a MockPaymentService.
-        // Asumimos que si se llama a este método, el pago en Stripe ya fue "succeeded" en el frontend.
         
         BigDecimal precioSuscripcion = preciosRepository.findByClave(tipo)
                 .map(ConfiguracionPrecios::getValor)
                 .orElse(BigDecimal.ZERO);
 
-        // Auditoría financiera en nuestra base de datos local
         Pagos nuevoPago = new Pagos();
         nuevoPago.setBarId(bar.getId());
         nuevoPago.setConcepto("Suscripción (Stripe): " + tipo);
@@ -184,7 +171,6 @@ public class BarService {
         nuevoPago.setFechaPago(LocalDateTime.now());
         pagosRepository.save(nuevoPago);
 
-        // Activamos al usuario y calculamos fecha fin
         bar.setTipoSuscripcion(tipo);
         bar.setActivo(true);
         bar.setFechaFinSuscripcion(tipo.equals("SUSCRIPCION_ANUAL") ? 

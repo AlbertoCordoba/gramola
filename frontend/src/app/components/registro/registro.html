@@ -16,6 +16,16 @@
           <input type="email" [(ngModel)]="registroData.email" name="email" placeholder="hola@bar.com" required [disabled]="cargando">
         </div>
 
+        <div class="form-group" style="margin-top: 15px;">
+            <label style="color: #1db954; font-weight: bold;">Spotify Client ID</label>
+            <input type="text" [(ngModel)]="registroData.clientId" name="clientId" placeholder="Pega tu Client ID aquí" required [disabled]="cargando">
+        </div>
+
+        <div class="form-group">
+            <label style="color: #1db954; font-weight: bold;">Spotify Client Secret</label>
+            <input type="password" [(ngModel)]="registroData.clientSecret" name="clientSecret" placeholder="Pega tu Client Secret aquí" required [disabled]="cargando">
+            <small style="display:block; margin-top:5px; color:#666;">Se guardará cifrado de forma segura.</small>
+        </div>
         <div class="form-row">
           <div class="form-group half">
             <label>Contraseña</label>
