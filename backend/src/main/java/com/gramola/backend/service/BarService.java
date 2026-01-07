@@ -1,31 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * 'BarService' gestiona todo el ciclo de vida del usuario (el dueño del local).
- * Es responsable de la seguridad, el acceso y la monetización de la plataforma.
- *
- * * PUNTOS CLAVE:
- * 1. SEGURIDAD (BCrypt):
- * Las contraseñas NUNCA se guardan en texto plano. Usamos 'BCryptPasswordEncoder'
- * para hashearlas antes de guardarlas en la base de datos.
- *
- * 2. GEOLOCALIZACIÓN (Fórmula del Haversine):
- * En el método 'login', implementamos un algoritmo matemático para calcular la
- * distancia entre el usuario y el bar. Si está a más de 100 metros, denegamos
- * el acceso. Esto es vital para evitar el uso fraudulento de la app.
- *
- * 3. DOBLE FACTOR DE ACTIVACIÓN:
- * Un usuario no puede entrar solo con registrarse. Implementamos un flujo de:
- * Registro -> Confirmación Email -> Pago Suscripción -> Cuenta Activa.
- *
- * 4. GESTIÓN DE FIRMAS (Base64):
- * Convertimos la firma digital que llega como String en Base64 desde el frontend
- * a un array de bytes (byte[]) para almacenarla eficientemente como BLOB.
- * ======================================================================================
- */
-
 package com.gramola.backend.service;
 
 import com.gramola.backend.dto.BarLoginDTO;
@@ -37,7 +9,7 @@ import com.gramola.backend.repository.BarRepository;
 import com.gramola.backend.repository.ConfiguracionPreciosRepository;
 import com.gramola.backend.repository.PagosRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder; // 1. IMPORTAR BCRYPT
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
@@ -54,12 +26,13 @@ public class BarService {
 
     @Autowired
     private BarRepository barRepository;
+    
     @Autowired
     private ConfiguracionPreciosRepository preciosRepository;
+    
     @Autowired
     private EmailService emailService;
-    @Autowired
-    private MockPaymentService paymentService;
+    
     @Autowired
     private PagosRepository pagosRepository;
     
@@ -189,20 +162,24 @@ public class BarService {
     }
 
     // --- SUSCRIPCIONES Y PAGOS ---
+    // NOTA: 'simularError' ya no se usa porque el pago real se hace en el frontend con Stripe,
+    // pero mantenemos el parámetro para no romper el BarController si no se ha actualizado.
     public void activarSuscripcion(String email, String tipo, boolean simularError) throws Exception {
-        Bar bar = barRepository.findByEmail(email).orElseThrow(() -> new Exception("Usuario no encontrado"));
+        Bar bar = barRepository.findByEmail(email)
+                .orElseThrow(() -> new Exception("Usuario no encontrado"));
         
-        // Procesamos el pago primero
-        paymentService.procesarPago(simularError);
-
+        // --- CAMBIO PARA STRIPE ---
+        // Eliminamos la llamada a MockPaymentService.
+        // Asumimos que si se llama a este método, el pago en Stripe ya fue "succeeded" en el frontend.
+        
         BigDecimal precioSuscripcion = preciosRepository.findByClave(tipo)
                 .map(ConfiguracionPrecios::getValor)
                 .orElse(BigDecimal.ZERO);
 
-        // Auditoría financiera
+        // Auditoría financiera en nuestra base de datos local
         Pagos nuevoPago = new Pagos();
         nuevoPago.setBarId(bar.getId());
-        nuevoPago.setConcepto("Suscripción: " + tipo);
+        nuevoPago.setConcepto("Suscripción (Stripe): " + tipo);
         nuevoPago.setMonto(precioSuscripcion);
         nuevoPago.setFechaPago(LocalDateTime.now());
         pagosRepository.save(nuevoPago);
