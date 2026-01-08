@@ -8,7 +8,7 @@ import com.gramola.backend.model.Pagos;
 import com.gramola.backend.repository.BarRepository;
 import com.gramola.backend.repository.ConfiguracionPreciosRepository;
 import com.gramola.backend.repository.PagosRepository;
-import com.gramola.backend.util.SimetricCipher; // Importamos nuestra utilidad
+import com.gramola.backend.util.SimetricCipher;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -50,20 +50,33 @@ public class BarService {
     }
 
     public void registrarBar(BarRegistroDTO datos) throws Exception {
-        if (barRepository.existsByEmail(datos.getEmail())) throw new Exception("El email ya existe");
-        if (!datos.getPassword().equals(datos.getConfirmPassword())) throw new Exception("Las contraseñas no coinciden");
+        // --- LÓGICA DE ESCENARIOS ALTERNATIVOS (Integrada) ---
+        Optional<Bar> barExistente = barRepository.findByEmail(datos.getEmail());
+        if (barExistente.isPresent()) {
+            Bar barPrevio = barExistente.get();
+            // Si el bar no está activo (no confirmó email o no pagó), se borra para permitir re-registro 
+            if (!barPrevio.isActivo()) {
+                barRepository.delete(barPrevio);
+            } else {
+                throw new Exception("El email ya existe y está activo");
+            }
+        }
+        // -----------------------------------------------------
+
+        if (!datos.getPassword().equals(datos.getConfirmPassword())) {
+            throw new Exception("Las contraseñas no coinciden");
+        }
 
         Bar bar = new Bar();
         bar.setNombre(datos.getNombre());
         bar.setEmail(datos.getEmail());
         
-        // --- NUEVO: Guardar credenciales de Spotify ---
+        // Guardar credenciales de Spotify
         bar.setClientId(datos.getClientId());
         
-        // IMPORTANTE: Ciframos el secreto antes de guardarlo en BD
+        // Ciframos el secreto antes de guardarlo en BD 
         String secretoCifrado = SimetricCipher.encrypt(datos.getClientSecret());
         bar.setClientSecret(secretoCifrado);
-        // ---------------------------------------------
         
         String passwordEncriptada = passwordEncoder.encode(datos.getPassword());
         bar.setPassword(passwordEncriptada); 
@@ -87,6 +100,7 @@ public class BarService {
 
         barRepository.save(bar);
         
+        // Enviar correo con el token generado [cite: 37, 38]
         emailService.sendWelcomeEmail(bar.getEmail(), token);
     }
 
@@ -98,29 +112,29 @@ public class BarService {
     }
 
     public Bar login(BarLoginDTO datos) throws Exception {
-            Bar bar = barRepository.findByEmail(datos.getEmail())
-                    .orElseThrow(() -> new Exception("Usuario no encontrado"));
+        Bar bar = barRepository.findByEmail(datos.getEmail())
+                .orElseThrow(() -> new Exception("Usuario no encontrado"));
 
-            if (!passwordEncoder.matches(datos.getPassword(), bar.getPassword())) {
-                throw new Exception("Contraseña incorrecta");
-            }
-            
-            if (bar.getTokenConfirmacion() != null) throw new Exception("Confirma tu email primero.");
-            if (!bar.isActivo()) throw new Exception("Completa el pago de suscripción.");
-            
-            if (datos.getLat() == null || datos.getLng() == null) {
-                throw new Exception("⚠️ Ubicación obligatoria. Activa el GPS para entrar.");
-            }
-            
-            if (bar.getLatitud() != null && bar.getLongitud() != null) {
-                double distancia = calcularDistancia(datos.getLat(), datos.getLng(), bar.getLatitud(), bar.getLongitud());
-                if (distancia > 100) {
-                    throw new Exception("⛔ Acceso denegado: Estás a " + (int)distancia + "m del bar (Máx 100m).");
-                }
-            }
-
-            return bar;
+        if (!passwordEncoder.matches(datos.getPassword(), bar.getPassword())) {
+            throw new Exception("Contraseña incorrecta");
         }
+        
+        if (bar.getTokenConfirmacion() != null) throw new Exception("Confirma tu email primero.");
+        if (!bar.isActivo()) throw new Exception("Completa el pago de suscripción.");
+        
+        if (datos.getLat() == null || datos.getLng() == null) {
+            throw new Exception("⚠️ Ubicación obligatoria. Activa el GPS para entrar.");
+        }
+        
+        if (bar.getLatitud() != null && bar.getLongitud() != null) {
+            double distancia = calcularDistancia(datos.getLat(), datos.getLng(), bar.getLatitud(), bar.getLongitud());
+            if (distancia > 100) {
+                throw new Exception("⛔ Acceso denegado: Estás a " + (int)distancia + "m del bar (Máx 100m).");
+            }
+        }
+
+        return bar;
+    }
 
     private double calcularDistancia(double lat1, double lon1, double lat2, double lon2) {
         final int R = 6371; 
