@@ -369,7 +369,7 @@
 /* --- HISTORIAL RECIENTE --- */
 .history-card {
   display: flex; align-items: center; padding: 15px 20px; /* Un poco más de padding */
-  background: rgba(255, 255, 255, 0.02); border-radius: 10px; margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.02); border-radius: 100px; margin-bottom: 8px;
   opacity: 0.6; filter: grayscale(1); transition: 0.3s;
   border: 1px solid rgba(255,255,255,0.05);
 }
@@ -407,7 +407,7 @@
 
 
 /* --- ANIMACIONES --- */
-@keyframes spin { from { transform: translateX(50px) rotate(0deg); } to { transform: translateX(50px) rotate(360deg); } }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 @keyframes blink { 0%, 100% { opacity: 1; box-shadow: 0 0 10px var(--primary); } 50% { opacity: 0.4; box-shadow: none; } }
 
 .fade-in { animation: fadeIn 0.6s ease-out; }
@@ -461,6 +461,7 @@
   overflow-y: auto;
   animation: scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
+
 /* Mejora visual para la interacción de dispositivos */
 .device-card-premium {
   cursor: pointer;
@@ -478,11 +479,195 @@
   background: rgba(30, 215, 96, 0.1) !important;
   box-shadow: 0 0 20px rgba(30, 215, 96, 0.2);
 }
+
 /* Animación de entrada tipo "Pop" */
 @keyframes scaleUp {
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }
 }
+
+/* ==============================================================
+   NUEVOS ESTILOS PARA DISPOSITIVOS (COHERENCIA VISUAL)
+   ============================================================== */
+
+.devices-glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(15px);
+  border: 1px solid var(--glass-border);
+  border-radius: 20px;
+  padding: 25px;
+  margin-bottom: 40px;
+}
+
+.device-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  padding-bottom: 15px;
+}
+
+.header-title-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.header-icon { font-size: 1.5rem; }
+.device-header h3 { margin: 0; font-size: 1.2rem; font-weight: 700; color: white; }
+
+.btn-refresh-devices {
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  padding: 8px 16px;
+  border-radius: 30px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s;
+}
+
+.btn-refresh-devices:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: var(--primary);
+}
+
+.refresh-icon { font-size: 1rem; display: inline-block; }
+.spinning .refresh-icon { animation: spin 1s linear infinite; }
+
+.device-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 15px;
+}
+
+.device-card-mini {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 15px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.device-card-mini:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.device-card-mini.is-active {
+  background: rgba(30, 215, 96, 0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 20px rgba(30, 215, 96, 0.15);
+}
+
+.device-icon-box {
+  width: 40px;
+  height: 40px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+}
+
+.pulse-icon-green {
+  color: var(--primary);
+  filter: drop-shadow(0 0 5px var(--primary));
+  animation: pulse-simple 2s infinite;
+}
+
+@keyframes pulse-simple {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.device-info-mini {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.d-name {
+  color: white;
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.d-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.d-type {
+  color: var(--text-sec);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.active-dot {
+  width: 6px;
+  height: 6px;
+  background: var(--primary);
+  border-radius: 50%;
+  box-shadow: 0 0 8px var(--primary);
+}
+
+.active-badge-glass {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background: var(--primary);
+  color: black;
+  font-size: 0.6rem;
+  font-weight: 900;
+  padding: 2px 8px;
+  border-bottom-left-radius: 8px;
+}
+
+.error-msg-container {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 50, 50, 0.1);
+  border-radius: 10px;
+  padding: 12px;
+  margin-top: 15px;
+}
+
+.error-msg-mini {
+  margin: 0;
+  color: #ff5555;
+  font-size: 0.85rem;
+}
+
+.no-devices-state {
+  text-align: center;
+  padding: 30px;
+  color: var(--text-sec);
+}
+
+.no-devices-state p { margin: 0; font-weight: 600; }
+.no-devices-state small { opacity: 0.6; }
+
 /* Responsive */
 @media (max-width: 850px) {
   .lists-layout { grid-template-columns: 1fr; }
@@ -493,4 +678,5 @@
   .ambient-floating-bar { width: 100%; padding: 0 20px; box-sizing: border-box; }
   .ambient-capsule { min-width: auto; width: 100%; padding: 10px; }
   .search-input { font-size: 1rem; }
+  .device-grid { grid-template-columns: 1fr; }
 }

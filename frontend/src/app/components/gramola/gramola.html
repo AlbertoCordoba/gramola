@@ -50,27 +50,50 @@
 
       <section class="devices-glass">
         <div class="device-header">
-          <h3>🖥️ Salida de Audio</h3>
+          <div class="header-title-group">
+            <span class="header-icon">🖥️</span>
+            <h3>Salida de Audio</h3>
+          </div>
           <button (click)="getDevices()" class="btn-refresh-devices" [class.spinning]="isSearching">
-            Recargar Dispositivos
+            <span class="refresh-icon">↻</span> Actualizar
           </button>
         </div>
+
         <div class="device-grid">
           <div class="device-card-mini" *ngFor="let device of devices" 
                [class.is-active]="device.is_active"
                (click)="selectDevice(device)">
-            <div class="device-icon-box">
-              <span *ngIf="!device.is_active">🎧</span>
-              <span *ngIf="device.is_active" class="pulse-icon">🎶</span>
+            
+            <div class="device-status-indicator">
+              <div class="device-icon-box">
+                <span *ngIf="!device.is_active">🎧</span>
+                <span *ngIf="device.is_active" class="pulse-icon-green">🔊</span>
+              </div>
             </div>
+
             <div class="device-info-mini">
               <span class="d-name">{{ device.name }}</span>
-              <span class="d-type">{{ device.type }}</span>
+              <div class="d-meta">
+                <span class="d-type">{{ device.type }}</span>
+                <span class="active-dot" *ngIf="device.is_active"></span>
+              </div>
             </div>
-            <div class="active-badge" *ngIf="device.is_active">ACTIVO</div>
+
+            <div class="active-badge-glass" *ngIf="device.is_active">
+              CONECTADO
+            </div>
           </div>
         </div>
-        <p class="error-msg-mini" *ngIf="deviceError">⚠️ {{ deviceError }}</p>
+
+        <div class="error-msg-container" *ngIf="deviceError">
+          <span class="error-icon">⚠️</span>
+          <p class="error-msg-mini">{{ deviceError }}</p>
+        </div>
+        
+        <div class="no-devices-state" *ngIf="devices.length === 0 && !deviceError && !isSearching">
+          <p>No se detectan dispositivos activos</p>
+          <small>Abre Spotify en tu móvil o PC para empezar</small>
+        </div>
       </section>
 
       <section class="search-section">
@@ -78,14 +101,14 @@
           <span class="search-icon" *ngIf="!isSearching">🔍</span>
           <div class="mini-spinner" *ngIf="isSearching"></div>
           <input type="text" [formControl]="searchControl" (keyup.enter)="search()" 
-                 placeholder="Añadir canción a la cola..." class="search-input">
+                 placeholder="Busca una canción para añadir..." class="search-input">
           <button (click)="search()" class="btn-search">Buscar</button>
         </div>
       </section>
 
       <div *ngIf="searchResults.length > 0" class="results-overlay fade-in-up">
         <div class="glass-header-results">
-          <h3>Resultados</h3>
+          <h3>Resultados de búsqueda</h3>
           <button class="btn-close" (click)="searchResults = []; searchControl.setValue('')">✕</button>
         </div>
         <div class="results-grid">
@@ -104,8 +127,11 @@
       </div>
 
       <div class="lists-layout">
+        
         <section class="queue-section">
-          <h3 class="section-title">Próximas Canciones</h3>
+          <div class="section-header-row">
+            <h3 class="section-title">Próximas Canciones</h3>
+          </div>
           <div class="queue-list">
             <div class="queue-card" *ngFor="let item of colaVisual; let i = index" [class.is-spotify]="item.tipo === 'AMBIENTE'">
               <div class="q-index">{{ i + 1 }}</div>
@@ -115,32 +141,40 @@
                 <span class="q-title">{{ item.titulo }}</span>
                 <span class="q-artist">{{ item.artista }}</span>
               </div>
-              <span class="badge-wait" *ngIf="item.tipo === 'PEDIDO'">💎 Pedido</span>
-              <span class="badge-wait ambient" *ngIf="item.tipo === 'AMBIENTE'">📻 Ambiente</span>
+              <div class="q-badges">
+                <span class="badge-wait" *ngIf="item.tipo === 'PEDIDO'">💎 Pedido</span>
+                <span class="badge-wait ambient" *ngIf="item.tipo === 'AMBIENTE'">📻 Ambiente</span>
+              </div>
             </div>
           </div>
         </section>
 
         <section class="history-section">
-          <h3 class="section-title">Historial Reciente</h3>
+          <div class="section-header-row">
+            <h3 class="section-title">Historial Reciente</h3>
+          </div>
           <div class="history-list">
             <div class="history-card" *ngFor="let item of historialVisual" [class.is-ambiente]="item.tipo === 'AMBIENTE'">
               <div class="h-info">
                 <span class="h-title">{{ item.titulo }}</span>
                 <span class="h-artist">{{ item.artista }}</span>
               </div>
-              <span class="h-check" *ngIf="item.tipo === 'PEDIDO'">💎</span>
-              <span class="h-check" *ngIf="item.tipo === 'AMBIENTE'">📻</span>
+              <div class="h-type-icon">
+                <span *ngIf="item.tipo === 'PEDIDO'">💎</span>
+                <span *ngIf="item.tipo === 'AMBIENTE'">📻</span>
+              </div>
             </div>
           </div>
         </section>
+
       </div>
     </div>
   </main>
 
   <div class="modal-backdrop" *ngIf="showPaymentModal">
-    <div class="modal-content">
+    <div class="modal-content glass-effect">
       <app-pasarela-pago [isModal]="true" (close)="onPaymentClosed($event)"></app-pasarela-pago>
     </div>
   </div>
+
 </div>
