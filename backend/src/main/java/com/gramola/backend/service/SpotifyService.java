@@ -31,19 +31,9 @@ public class SpotifyService {
     public String getAuthorizationUrl(Long barId) {
         Bar bar = barRepository.findById(barId).orElseThrow(() -> new RuntimeException("Bar no encontrado"));
         String clientId = bar.getClientId();
-        
-        if (clientId == null || clientId.isEmpty()) {
-            throw new RuntimeException("El bar no tiene Client ID configurado.");
-        }
-        
+        if (clientId == null || clientId.isEmpty()) throw new RuntimeException("El bar no tiene Client ID configurado.");
         String scope = "streaming user-read-private user-read-email user-modify-playback-state user-read-playback-state playlist-read-private";
-        
-        return "https://accounts.spotify.com/authorize" + 
-                "?client_id=" + clientId +
-                "&response_type=code" +
-                "&redirect_uri=" + redirectUri +
-                "&scope=" + scope +
-                "&state=" + barId; 
+        return "https://accounts.spotify.com/authorize?client_id=" + clientId + "&response_type=code&redirect_uri=" + redirectUri + "&scope=" + scope + "&state=" + barId; 
     }
 
     public void exchangeCodeForToken(String code, Long barId) {
@@ -54,7 +44,6 @@ public class SpotifyService {
     public String getAccessTokenForBar(Long barId) {
         Bar bar = barRepository.findById(barId).orElseThrow(() -> new RuntimeException("Bar no encontrado"));
         if (bar.getSpotifyRefreshToken() == null) throw new RuntimeException("No conectado");
-
         if (bar.getSpotifyTokenExpiresAt() == null || LocalDateTime.now().isAfter(bar.getSpotifyTokenExpiresAt())) {
             processTokenRequest(null, bar.getSpotifyRefreshToken(), "refresh_token", bar);
         }
@@ -64,40 +53,50 @@ public class SpotifyService {
     private void processTokenRequest(String code, String refreshToken, String grantType, Bar bar) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-        
-        String clientId = bar.getClientId();
-        String clientSecret = SimetricCipher.decrypt(bar.getClientSecret()); 
-        headers.setBasicAuth(clientId, clientSecret);
-
+        headers.setBasicAuth(bar.getClientId(), SimetricCipher.decrypt(bar.getClientSecret()));
         MultiValueMap<String, String> body = new LinkedMultiValueMap<>();
         body.add("grant_type", grantType);
         if (code != null) body.add("code", code);
         if (refreshToken != null) body.add("refresh_token", refreshToken);
         body.add("redirect_uri", redirectUri);
-
-        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(body, headers);
-
         try {
-            ResponseEntity<Map> response = restTemplate.postForEntity("https://accounts.spotify.com/api/token", request, Map.class);
+            ResponseEntity<Map> response = restTemplate.postForEntity("https://accounts.spotify.com/api/token", new HttpEntity<>(body, headers), Map.class);
             Map<String, Object> resp = response.getBody();
             if (resp != null) {
                 bar.setSpotifyAccessToken((String) resp.get("access_token"));
-                Integer expiresIn = (Integer) resp.get("expires_in");
-                bar.setSpotifyTokenExpiresAt(LocalDateTime.now().plusSeconds(expiresIn != null ? expiresIn : 3600));
+                bar.setSpotifyTokenExpiresAt(LocalDateTime.now().plusSeconds(Long.parseLong(resp.get("expires_in").toString())));
                 if (resp.containsKey("refresh_token")) bar.setSpotifyRefreshToken((String) resp.get("refresh_token"));
                 barRepository.save(bar);
             }
-        } catch (Exception e) {
-            throw new RuntimeException("Error en el token: " + e.getMessage());
-        }
+        } catch (Exception e) { throw new RuntimeException(e.getMessage()); }
     }
 
     public Object search(String query, String type, Long barId) {
-        String token = getAccessTokenForBar(barId);
         HttpHeaders headers = new HttpHeaders();
-        headers.setBearerAuth(token);
-        String url = UriComponentsBuilder.fromUriString("https://api.spotify.com/v1/search")
-                .queryParam("q", query).queryParam("type", type).queryParam("limit", 10).toUriString();
+        headers.setBearerAuth(getAccessTokenForBar(barId));
+        String url = UriComponentsBuilder.fromUriString("https://api.spotify.com/v1/search").queryParam("q", query).queryParam("type", type).toUriString();
         return restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), Map.class).getBody();
+    }
+
+    public Object getPlaylist(String playlistId, Long barId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(getAccessTokenForBar(barId));
+        return restTemplate.exchange("https://api.spotify.com/v1/playlists/" + playlistId, HttpMethod.GET, new HttpEntity<>(headers), Map.class).getBody();
+    }
+
+    public void playTrack(String trackUri, String deviceId, Long barId) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(getAccessTokenForBar(barId));
+        Map<String, Object> body = Collections.singletonMap("uris", Collections.singletonList(trackUri));
+        restTemplate.put("https://api.spotify.com/v1/me/player/play?device_id=" + deviceId, new HttpEntity<>(body, headers));
+    }
+
+    public void playContext(String contextUri, String deviceId, Long barId, String offsetUri) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setBearerAuth(getAccessTokenForBar(barId));
+        Map<String, Object> body = new HashMap<>();
+        body.put("context_uri", contextUri);
+        if (offsetUri != null) body.put("offset", Collections.singletonMap("uri", offsetUri));
+        restTemplate.put("https://api.spotify.com/v1/me/player/play?device_id=" + deviceId, new HttpEntity<>(body, headers));
     }
 }
