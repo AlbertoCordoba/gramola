@@ -461,7 +461,23 @@
   overflow-y: auto;
   animation: scaleUp 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
+/* Mejora visual para la interacción de dispositivos */
+.device-card-premium {
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
 
+.device-card-premium:hover {
+  background: rgba(255, 255, 255, 0.12) !important;
+  transform: translateY(-3px);
+  border-color: var(--primary);
+}
+
+.device-card-premium.is-active {
+  border-color: var(--primary);
+  background: rgba(30, 215, 96, 0.1) !important;
+  box-shadow: 0 0 20px rgba(30, 215, 96, 0.2);
+}
 /* Animación de entrada tipo "Pop" */
 @keyframes scaleUp {
   from { transform: scale(0.8); opacity: 0; }

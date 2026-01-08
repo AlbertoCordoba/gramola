@@ -2,12 +2,9 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class SpotifyConnectService {
   private http = inject(HttpClient);
-  // Importante: El backend sigue en localhost aunque navegues por 127.0.0.1
   private apiUrl = 'http://localhost:8080/api/spotify'; 
 
   getAuthUrl(userId: string | number): Observable<any> {
@@ -25,31 +22,28 @@ export class SpotifyConnectService {
     return this.http.get(`${this.apiUrl}/token`, { params });
   }
 
+  // NUEVO: CARGA DE DISPOSITIVOS (Figura 27)
+  getDevices(barId: number | string): Observable<any> {
+    const params = new HttpParams().set('barId', barId.toString());
+    return this.http.get(`${this.apiUrl}/devices`, { params });
+  }
+
   search(query: string, userId: string | number, type: string = 'track'): Observable<any> {
     const params = new HttpParams().set('q', query).set('type', type).set('barId', userId.toString());
     return this.http.get(`${this.apiUrl}/search`, { params });
   }
 
-  // --- MÉTODOS RECUPERADOS PARA QUE GRAMOLA NO DE ERROR ---
   getPlaylist(playlistId: string, userId: string | number): Observable<any> {
     const params = new HttpParams().set('id', playlistId).set('barId', userId.toString());
     return this.http.get(`${this.apiUrl}/playlist`, { params });
   }
 
   playContext(uri: string, deviceId: string, userId: string | number, offsetUri?: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/play`, {
-      contextUri: uri,
-      deviceId: deviceId,
-      barId: userId,
-      offsetUri: offsetUri
-    });
+    return this.http.post(`${this.apiUrl}/play`, { contextUri: uri, deviceId: deviceId, barId: userId, offsetUri: offsetUri });
   }
 
   playTrack(spotifyId: string, deviceId: string, userId: string | number): Observable<any> {
-    return this.http.post(`${this.apiUrl}/play`, {
-      spotifyId: spotifyId.replace('spotify:track:', ''),
-      deviceId: deviceId,
-      barId: userId
-    });
+    const cleanId = spotifyId.includes('spotify:track:') ? spotifyId : `spotify:track:${spotifyId}`;
+    return this.http.post(`${this.apiUrl}/play`, { spotifyId: cleanId, deviceId: deviceId, barId: userId });
   }
 }

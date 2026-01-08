@@ -111,6 +111,11 @@ export class Gramola implements OnInit, OnDestroy {
   private songStartTime: number = 0;     // Para evitar añadir canciones al historial si solo sonaron 1 seg
   private wasPedido: boolean = false;    
 
+  // --- GESTIÓN DE DISPOSITIVOS (Añadido según Figura 26) ---
+  devices: any[] = [];
+  currentDevice: any;
+  deviceError? : string;
+
   constructor() {
     // 1. Recuperación de Sesión
     const userJson = localStorage.getItem('usuarioBar');
@@ -170,6 +175,8 @@ export class Gramola implements OnInit, OnDestroy {
       this.cargarPrecioCancion();
       
       this.setupLiveSearch(); // Configuramos el pipeline de búsqueda reactiva
+
+      this.getDevices(); // Petición inicial de dispositivos (Figura 26)
 
       // 5. POLLING (Sondeo periódico)
       // En lugar de WebSockets (que sería más complejo), hacemos peticiones cada 5s
@@ -232,7 +239,7 @@ export class Gramola implements OnInit, OnDestroy {
           this.cdr.detectChanges();
         });
       },
-      error: (err) => {
+      error: (err: any) => {
         console.error("Error crítico en buscador:", err);
         this.isSearching = false;
       }
@@ -252,7 +259,7 @@ export class Gramola implements OnInit, OnDestroy {
           this.actualizarColaVisual();
         }
       },
-      error: (e) => console.error("Error cargando respaldo:", e)
+      error: (e: any) => console.error("Error cargando respaldo:", e)
     });
   }
 
@@ -409,7 +416,25 @@ export class Gramola implements OnInit, OnDestroy {
           console.log('✅ Precio actualizado:', this.precioCancion);
         }
       },
-      error: (e) => console.error('Error cargando precio', e)
+      error: (e: any) => console.error('Error cargando precio', e)
+    });
+  }
+
+  // --- GESTIÓN DE DISPOSITIVOS (Figura 27) ---
+  getDevices() {
+    this.deviceError = undefined;
+    this.spotifyService.getDevices(this.usuario.id).subscribe({
+      next: (result: any) => {
+        this.devices = result.devices;
+        this.currentDevice = this.devices.find((d: any) => d.is_active);
+        if (!this.currentDevice) {
+          this.deviceError = "No hay ningún dispositivo conectado";
+        }
+        this.cdr.detectChanges();
+      },
+      error: (err: any) => {
+        this.deviceError = err.message;
+      }
     });
   }
 
@@ -491,12 +516,12 @@ export class Gramola implements OnInit, OnDestroy {
             // Reintentamos reproducir el pedido
             this.spotifyService.playTrack(pedidoGuardado.spotifyId, this.deviceId, this.usuario.id).subscribe({
                 next: () => this.verificarAutoplay(),
-                error: (err) => {
+                error: (err: any) => {
                     // Si falla el reintento, hacemos fallback a ambiente (Degradación grácil)
                     setTimeout(() => {
                         this.spotifyService.playTrack(pedidoGuardado.spotifyId, this.deviceId, this.usuario.id).subscribe({
                             next: () => this.verificarAutoplay(),
-                            error: () => {
+                            error: (err2: any) => {
                                 this.changingTrack = false;
                                 this.necesitaInteraccion = true;
                                 this.cdr.detectChanges();
@@ -505,7 +530,7 @@ export class Gramola implements OnInit, OnDestroy {
                     }, 2000);
                 }
             });
-        } catch (e) {
+        } catch (e: any) {
             this.changingTrack = false;
             this.reproducirAmbiente(true);
         }
@@ -538,6 +563,23 @@ export class Gramola implements OnInit, OnDestroy {
   // MÉTODO MAESTRO: Reacciona a cada evento del reproductor
   gestionarCambioDeEstado(state: any) {
     if (!state) return;
+
+    // --- DETECCIÓN PROACTIVA DE FIN DE CANCIÓN (Autoplay) ---
+    // Detectamos si la canción ha terminado: pausada, posición 0 y sin pistas siguientes nativas
+    const isFinished = state.paused && state.position === 0 && state.track_window.next_tracks.length === 0;
+
+    if (isFinished && !this.changingTrack) {
+        console.log("Canción finalizada detectada. Saltando...");
+        this.finalizarPedidoActual(); 
+        if (this.colaReproduccion.length > 0) {
+             this.procesarSiguientePedido();
+        } else {
+             this.reproducirAmbiente();
+        }
+        return;
+    }
+    // -------------------------------------------------------
+
     const track = state.track_window.current_track;
     if (!track) return;
 
@@ -563,8 +605,7 @@ export class Gramola implements OnInit, OnDestroy {
          }
     }
 
-    // --- DETECCIÓN DE FIN DE PEDIDO ---
-    // Si cambió la canción y estábamos en modo PEDIDO...
+    // --- DETECCIÓN DE FIN DE PEDIDO POR CAMBIO DE TRACK ---
     if (this.lastTrackId && trackId !== this.lastTrackId && this.modoReproduccion === 'PEDIDO' && !this.changingTrack) {
         // 1. Marcar pedido como terminado en BD
         this.finalizarPedidoActual(); 
@@ -613,7 +654,9 @@ export class Gramola implements OnInit, OnDestroy {
     this.isPaused = state.paused;
     this.durationMs = state.duration;
     this.progressMs = state.position;
-    this.progressPercent = (this.progressMs / this.durationMs) * 100;
+    if (this.durationMs > 0) {
+        this.progressPercent = (this.progressMs / this.durationMs) * 100;
+    }
 
     // Caso Borde: Spotify a veces pausa al final de la canción en lugar de cambiar
     if (!this.changingTrack && this.modoReproduccion === 'PEDIDO') {
@@ -661,7 +704,7 @@ export class Gramola implements OnInit, OnDestroy {
         if (chequearAutoplay) this.verificarAutoplay();
         else this.resetVariables();
       },
-      error: (err) => {
+      error: (err: any) => {
         // Fallback: Si el offset falla (ej: canción borrada de la lista), reproducimos sin offset
         if (offset) {
              localStorage.removeItem('ambientResumeUri'); 
@@ -671,7 +714,7 @@ export class Gramola implements OnInit, OnDestroy {
                     if (chequearAutoplay) this.verificarAutoplay();
                     else this.resetVariables();
                  },
-                 error: () => {
+                 error: (err2: any) => {
                      this.necesitaInteraccion = true;
                      this.changingTrack = false;
                      this.cdr.detectChanges();
@@ -730,7 +773,7 @@ export class Gramola implements OnInit, OnDestroy {
             this.cdr.detectChanges(); 
         }, 1500);
       },
-      error: () => { 
+      error: (err: any) => { 
         // Si falla, no bloqueamos la cola, saltamos
         this.changingTrack = false; 
         this.reproducirAmbiente(); 
@@ -787,7 +830,7 @@ export class Gramola implements OnInit, OnDestroy {
     }
   }
 
-  // CAMBIO 3: Validación del precio y preparación del pago dinámico
+  // Validación del precio y preparación del pago dinámico
   anadir(track: any) {
     // Seguridad: Si no tenemos precio, no dejamos comprar
     if (this.precioCancion <= 0) {
@@ -837,4 +880,15 @@ export class Gramola implements OnInit, OnDestroy {
     if (this.progressTimer) clearInterval(this.progressTimer);
     this.titleService.setTitle('Gramola'); 
   }
+  selectDevice(device: any) {
+      this.deviceId = device.id;
+      this.currentDevice = device;
+      
+      // Forzamos la transferencia de la reproducción a este dispositivo
+      // llamando a tu método de ambiente con el parámetro de autoplay
+      this.reproducirAmbiente(true);
+      
+      // Forzamos a Angular a que actualice la vista para que se vea el "check" de activo
+      this.cdr.detectChanges();
+    }
 }
