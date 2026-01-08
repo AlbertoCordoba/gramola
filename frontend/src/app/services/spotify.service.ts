@@ -1,16 +1,5 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * Servicio de integración con Spotify.
- * IMPORTANTE: Implementa un patrón "Backend-For-Frontend" (BFF) o Proxy.
- * Las llamadas a la API de Spotify (excepto la reproducción local del SDK) 
- * se delegan al servidor Java para proteger los Tokens de Acceso y Secretos.
- * ======================================================================================
- */
-
 import { Injectable, inject } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
 @Injectable({
@@ -18,63 +7,65 @@ import { Observable } from 'rxjs';
 })
 export class SpotifyConnectService {
   private http = inject(HttpClient);
-  // Todas las peticiones van a nuestro Backend Java, no a 'api.spotify.com'
-  private apiUrl = 'http://localhost:8080/api/spotify';
+  // El backend siempre está en localhost:8080
+  private apiUrl = 'http://localhost:8080/api/spotify'; 
 
-  // Obtiene la URL para iniciar el flujo OAuth 2.0 (Login con Spotify)
-  getAuthUrl(barId: number): Observable<{ url: string }> {
-    return this.http.get<{ url: string }>(`${this.apiUrl}/auth-url`, { 
-      params: { barId: barId.toString() } 
-    });
+  // 1. Obtener URL de Login
+  getAuthUrl(userId: string | number): Observable<any> {
+    const params = new HttpParams().set('barId', userId.toString());
+    return this.http.get(`${this.apiUrl}/auth-url`, { params });
   }
 
-  // Obtiene el Access Token fresco desde el Backend para inicializar el SDK del navegador
-  getToken(barId: number): Observable<{ access_token: string }> {
-    return this.http.get<{ access_token: string }>(`${this.apiUrl}/token`, { 
-      params: { barId: barId.toString() } 
-    });
+  // 2. Enviar código al Backend (Puente para el Callback)
+  enviarCodigoAlBackend(code: string, userId: string | number): Observable<any> {
+    const params = new HttpParams()
+      .set('code', code)
+      .set('state', userId.toString());
+    return this.http.get(`${this.apiUrl}/callback`, { params });
   }
 
-  /*
-   * BUSCADOR PROXY
-   * El frontend envía "q=Malamanera" al backend.
-   * El backend añade el Token seguro, llama a Spotify y devuelve el JSON limpio.
-   */
-  search(query: string, barId: number, type: string = 'track'): Observable<any> {
-    return this.http.get(`${this.apiUrl}/search`, { 
-      params: { q: query, barId: barId.toString(), type: type } 
-    });
+  // 3. Obtener Token (para el reproductor SDK)
+  getToken(userId: string | number): Observable<any> {
+    const params = new HttpParams().set('barId', userId.toString());
+    return this.http.get(`${this.apiUrl}/token`, { params });
   }
 
-  // Recupera los detalles de una playlist (canciones) a través del proxy
-  getPlaylist(id: string, barId: number): Observable<any> {
-    return this.http.get(`${this.apiUrl}/playlist`, { 
-      params: { id: id, barId: barId.toString() } 
-    });
+  // 4. Buscador de Playlists/Canciones
+  search(query: string, userId: string | number, type: string = 'track'): Observable<any> {
+    const params = new HttpParams()
+      .set('q', query)
+      .set('type', type)
+      .set('barId', userId.toString());
+    return this.http.get(`${this.apiUrl}/search`, { params });
   }
 
-  /*
-   * CONTROL REMOTO (PLAY TRACK)
-   * Envía la orden de reproducir una canción específica.
-   * Parámetros:
-   * - spotifyId: ID de la canción.
-   * - deviceId: ID del "altavoz virtual" que crea el navegador.
-   */
-  playTrack(spotifyId: string, deviceId: string, barId: number): Observable<any> {
-    return this.http.post(`${this.apiUrl}/play`, { barId, deviceId, spotifyId });
+  // 5. Obtener detalles de una Playlist (Lo que te fallaba)
+  getPlaylist(playlistId: string, userId: string | number): Observable<any> {
+    const params = new HttpParams()
+        .set('id', playlistId)
+        .set('barId', userId.toString());
+    return this.http.get(`${this.apiUrl}/playlist`, { params });
   }
 
-  /*
-   * CONTROL REMOTO (PLAY CONTEXT/PLAYLIST)
-   * Envía la orden de reproducir un contexto (Album o Playlist) entero.
-   * - offsetUri: Opcional. Sirve para decir "Empieza la playlist por ESTA canción concreta".
-   */
-  playContext(contextUri: string, deviceId: string, barId: number, offsetUri?: string): Observable<any> {
-    return this.http.post(`${this.apiUrl}/play`, { 
-      barId, 
-      deviceId, 
-      contextUri,
-      offsetUri
+  // 6. Reproducir una Playlist o Contexto (Lo que te fallaba)
+  playContext(uri: string, deviceId: string, userId: string | number, offsetUri?: string): Observable<any> {
+    const body: any = {
+      contextUri: uri,
+      deviceId: deviceId,
+      barId: userId
+    };
+    if (offsetUri) body.offsetUri = offsetUri;
+    return this.http.post(`${this.apiUrl}/play`, body);
+  }
+
+  // 7. Reproducir una canción específica (Lo que te fallaba)
+  playTrack(spotifyId: string, deviceId: string, userId: string | number): Observable<any> {
+    // Si el ID no tiene el prefijo de Spotify, se lo podemos añadir aquí o en el backend
+    const cleanId = spotifyId.replace('spotify:track:', '');
+    return this.http.post(`${this.apiUrl}/play`, {
+      spotifyId: cleanId,
+      deviceId: deviceId,
+      barId: userId
     });
   }
 }

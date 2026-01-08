@@ -2,56 +2,81 @@
   
   <div class="content-wrapper">
 
-    <div *ngIf="!spotifyConnected" class="connect-screen fade-in">
-      <div class="glass-card connect-card">
-        <div class="icon-pulse">🔌</div>
-        <h2>Sincronización Requerida</h2>
-        <p>Conecta tu cuenta de Spotify Premium para activar el sistema de audio del bar.</p>
-        <button (click)="conectarSpotify()" class="btn-primary glow">
-          <img src="https://storage.googleapis.com/pr-newsroom-wp/1/2018/11/Spotify_Logo_CMYK_Black.png" class="spotify-logo-btn">
-          Conectar Ahora
-        </button>
-      </div>
-    </div>
-
-    <div *ngIf="spotifyConnected" class="glass-card setup-card fade-in">
+    <div class="glass-card setup-card fade-in">
+      
       <div class="header-setup">
         <div class="icon-static">📻</div>
         <h2>Música de Ambiente</h2>
       </div>
-      <p>Elige la playlist que sonará cuando no haya pedidos de clientes.</p>
-      
-      <div class="search-box">
-        <span class="search-icon" *ngIf="!cargando">🔍</span>
-        <div class="mini-spinner" *ngIf="cargando"></div>
 
-        <input type="text" 
-               [formControl]="searchControl" 
-               (keyup.enter)="buscar()" 
-               placeholder="Ej: Rock FM, Top 50 España o pega un enlace...">
-        
-        <button (click)="buscar()" class="btn-search">Buscar</button>
+      <div *ngIf="statusMessage" class="status-alert"
+           [style.color]="statusMessage.includes('❌') || statusMessage.includes('⚠️') ? '#ff4d4d' : '#1ed760'">
+        {{ statusMessage }}
       </div>
-
-      <div class="results-list" *ngIf="resultados.length > 0">
-        <div class="playlist-item" *ngFor="let pl of resultados" (click)="seleccionar(pl)">
-          
-          <img [src]="(pl.images && pl.images.length > 0) ? pl.images[0].url : 'assets/disc.png'" 
-               class="pl-img" 
-               alt="Portada">
-
-          <div class="pl-info">
-            <span class="pl-name">{{ pl.name }}</span>
-            <span class="pl-tracks">{{ pl.tracks?.total || 0 }} canciones</span>
-          </div>
-          <button class="btn-select">Elegir</button>
+      
+      <div *ngIf="necesitaConexion" class="connect-section fade-in">
+        <p class="description-text">
+          Para activar la Gramola, vincula tu cuenta de Spotify Premium.
+        </p>
+        
+        <div class="pulse-container">
+          <button (click)="conectarSpotify()" class="btn-spotify glow-effect">
+            <span class="spotify-icon">🎧</span> Conectar con Spotify
+          </button>
         </div>
       </div>
-      
-      <p *ngIf="resultados.length === 0 && searchControl.value && !cargando && searchControl.value!.length > 2" class="no-results">
-        No se encontraron playlists.
-      </p>
-      
+
+      <div *ngIf="!necesitaConexion" class="search-section fade-in">
+        <p class="description-text">Elige la playlist base para tu bar.</p>
+
+        <div class="search-box">
+          <span class="search-icon" *ngIf="!cargando">🔍</span>
+          <div class="mini-spinner" *ngIf="cargando"></div>
+
+          <input type="text" 
+                 [(ngModel)]="busqueda" 
+                 (keyup)="onSearch()" 
+                 placeholder="Ej: Rock FM, Top 50 España...">
+          
+          <button (click)="onSearch()" class="btn-search">Buscar</button>
+        </div>
+
+        <div class="results-list" *ngIf="resultados.length > 0">
+          <div class="playlist-item" 
+               *ngFor="let pl of resultados" 
+               (click)="seleccionar(pl)"
+               [class.active]="playlistSeleccionada?.id === pl.id">
+            
+            <div class="img-wrapper">
+               <div class="img-skeleton" *ngIf="!pl.imgLoaded"></div>
+               <img [src]="pl.images?.[0]?.url || 'assets/disc.png'" 
+                    (load)="pl.imgLoaded = true"
+                    [class.visible]="pl.imgLoaded"
+                    class="pl-img" alt="Portada">
+            </div>
+
+            <div class="pl-info">
+              <span class="pl-name">{{ pl.name }}</span>
+              <span class="pl-tracks">{{ pl.tracks?.total || 0 }} canciones</span>
+            </div>
+            
+            <button class="btn-select">
+               {{ playlistSeleccionada?.id === pl.id ? '✅' : 'Elegir' }}
+            </button>
+          </div>
+        </div>
+        
+        <p *ngIf="!cargando && resultados.length === 0 && busqueda.length > 2" class="no-results">
+          No se encontraron playlists.
+        </p>
+
+        <div *ngIf="playlistSeleccionada" class="footer-actions fade-in">
+          <button (click)="confirmar()" class="btn-primary">
+            Confirmar y Entrar
+          </button>
+        </div>
+      </div>
+
     </div>
 
   </div>

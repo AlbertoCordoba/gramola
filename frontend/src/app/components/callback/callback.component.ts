@@ -1,55 +1,36 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * Es un componente auxiliar diseñado para manejar la redirección de OAuth 2.0.
- *
- * * PUNTOS CLAVE TÉCNICOS:
- * 1. PARSEO DE URL (Fragmentos):
- * A diferencia de los parámetros normales (?id=1), los tokens de acceso en flujos
- * implícitos vienen en el "hash" de la URL (#access_token=XYZ).
- * Este componente captura ese fragmento, lo limpia y extrae el token.
- *
- * 2. PERSISTENCIA LOCAL:
- * Usa 'localStorage' para guardar el token. Esto permite que la sesión persista
- * incluso si el usuario recarga la página.
- * ======================================================================================
- */
-
-import { Component, OnInit } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, OnInit, inject } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
+import { SpotifyConnectService } from '../../services/spotify.service';
+import { CommonModule } from '@angular/common';
 
 @Component({
   selector: 'app-callback',
-  template: '<p>Conectando con Spotify...</p>'
+  standalone: true,
+  imports: [CommonModule],
+  template: `
+    <div style="height: 100vh; display: flex; justify-content: center; align-items: center; background: #000; color: white;">
+      <h2>🔄 Vinculando cuenta...</h2>
+    </div>
+  `
 })
 export class CallbackComponent implements OnInit {
-  constructor(private router: Router) {}
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+  private spotifyService = inject(SpotifyConnectService);
 
   ngOnInit() {
-    // 1. OBTENCIÓN DEL HASH
-    // window.location.hash devuelve algo como "#access_token=BQD..."
-    // .substring(1) elimina el carácter "#" inicial para dejar solo los datos.
-    const hash = window.location.hash.substring(1);
+    this.route.queryParams.subscribe(params => {
+      const code = params['code'];
+      const userId = params['state'];
 
-    // 2. PARSEO DE PARÁMETROS
-    // Usamos la API nativa 'URLSearchParams' para convertir la cadena de texto
-    // en un objeto manejable donde podemos pedir valores por clave (.get()).
-    const params = new URLSearchParams(hash);
-    
-    // 3. EXTRACCIÓN
-    const accessToken = params.get('access_token');
-
-    if (accessToken) {
-      // 4. ALMACENAMIENTO SEGURO
-      // Guardamos el token en el navegador. Es crítico para que los Servicios
-      // puedan inyectarlo luego en las cabeceras Authorization de las peticiones HTTP.
-      localStorage.setItem('spotify_access_token', accessToken);
-      
-      // 5. REDIRECCIÓN
-      // Navegamos a la raíz ('/') para iniciar la app ya autenticada.
-      this.router.navigate(['/']); 
-    }
+      if (code && userId) {
+        this.spotifyService.enviarCodigoAlBackend(code, userId).subscribe({
+          next: () => this.router.navigate(['/config-audio'], { queryParams: { status: 'success' } }),
+          error: () => this.router.navigate(['/config-audio'], { queryParams: { status: 'error' } })
+        });
+      } else {
+        this.router.navigate(['/login']);
+      }
+    });
   }
 }
