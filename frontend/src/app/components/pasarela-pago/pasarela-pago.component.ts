@@ -4,7 +4,6 @@ import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { PagoStateService } from '../../services/pago-state.service';
 
-// Declaramos la variable global de Stripe que viene del script del index.html
 declare var Stripe: any;
 
 @Component({
@@ -16,177 +15,120 @@ declare var Stripe: any;
 })
 export class PasarelaPagoComponent implements OnInit, OnDestroy {
   
-  // --- INYECCIONES ---
   private pagoState = inject(PagoStateService);
   private http = inject(HttpClient);
   private router = inject(Router);
-  private cdr = inject(ChangeDetectorRef); // Fundamental para actualizar el botón
+  private cdr = inject(ChangeDetectorRef);
 
-  // --- COMUNICACIÓN (MODAL) ---
   @Input() isModal: boolean = false; 
   @Output() close = new EventEmitter<boolean>(); 
 
-  // --- DATOS ---
   datosPago: any;
-  
-  // --- VARIABLES STRIPE ---
   stripe: any;
   elements: any;
   card: any; 
   clientSecret: string = '';
   
-  // --- ESTADO UI ---
   procesando: boolean = false;
-  stripeReady: boolean = false; // Controla si el botón está gris o verde
+  stripeReady: boolean = false; 
   errorGeneral: string = '';
   mensajeExito: string = '';
 
-  // TU CLAVE PÚBLICA (La que me pasaste)
   stripePublicKey = 'pk_test_51Sn1eQRvZ6y98AypGTwUQsWGR4QVneAgT3sb3hKRDL0FUV8XWfG9HKJEAhIg4ppfy83nGiAarwVFifsmUqnX9HTI00O9Hbx5bq';
 
   ngOnInit() {
     this.datosPago = this.pagoState.getPago();
-    
-    // Seguridad: Si no hay datos (F5), volvemos atrás
     if (!this.datosPago) {
       this.cancelar();
       return;
     }
 
-    // 1. Inicializar Stripe
     if (typeof Stripe !== 'undefined') {
       this.stripe = Stripe(this.stripePublicKey);
-      // 2. Pedir permiso al backend (Client Secret)
       this.obtenerIntencionDePago();
-    } else {
-      this.errorGeneral = "Error crítico: Stripe no ha cargado. Revisa tu index.html.";
     }
   }
 
   ngOnDestroy() {
-    // Limpieza al salir para no dejar basura en el DOM
-    if (this.card) {
-      this.card.destroy();
-    }
+    if (this.card) this.card.destroy();
   }
 
   obtenerIntencionDePago() {
-    const email = this.datosPago.payload.email || 'usuario_anonimo@gramola.com';
+    // BUSCAMOS EL EMAIL REAL:
+    // 1. Del payload del pago (si viene de registro o canción)
+    // 2. Del usuario logueado en el bar
+    const storageUser = JSON.parse(localStorage.getItem('usuarioBar') || '{}');
+    const emailReal = this.datosPago.payload?.email || storageUser.email || 'error@gramola.com';
+    const tipo = this.datosPago.tipo; 
 
-    this.http.get<any>(`http://localhost:8080/payments/prepay?email=${email}`)
+    this.http.get<any>(`http://localhost:8080/payments/prepay?email=${emailReal}&tipo=${tipo}`)
       .subscribe({
         next: (res) => {
           try {
-            // El backend devuelve un objeto StripeTransaction, el JSON real está dentro de 'data'
+            // El backend ahora envía un JSON limpio
             const stripeData = JSON.parse(res.data);
             this.clientSecret = stripeData.client_secret;
-            
-            // Ya tenemos la llave, montamos el formulario
             this.montarFormularioStripe();
           } catch (e) {
-            this.errorGeneral = 'Error leyendo la respuesta del servidor de pagos.';
+            this.errorGeneral = 'Error procesando la respuesta de pagos.';
           }
         },
-        error: (err) => {
-          console.error(err);
-          this.errorGeneral = 'No se pudo conectar con el servidor (Backend).';
-        }
+        error: () => this.errorGeneral = 'Error conectando con el servidor de pagos.'
       });
   }
 
   montarFormularioStripe() {
     this.elements = this.stripe.elements();
     
-    // Estilos del IFRAME interno de Stripe
     const style = {
       base: {
-        color: '#32325d',
+        color: '#ffffff',
         fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
-        fontSmoothing: 'antialiased',
         fontSize: '16px',
         '::placeholder': { color: '#aab7c4' }
-      },
-      invalid: {
-        color: '#fa755a',
-        iconColor: '#fa755a'
       }
     };
 
-    // Crear y montar el input
-    this.card = this.elements.create('card', { style: style });
+    this.card = this.elements.create('card', { 
+      style: style,
+      hidePostalCode: true // Requisito 2.4 del doc
+    });
     this.card.mount('#card-element');
     
-    // --- ESCUCHA DE EVENTOS (Aquí estaba el problema) ---
     this.card.on('change', (event: any) => {
-      const displayError = document.getElementById('card-errors');
-      
-      // 1. Mostrar errores de validación (ej: "Falta el año")
-      if (event.error) {
-        displayError!.textContent = event.error.message;
-      } else {
-        displayError!.textContent = '';
-      }
-
-      // 2. ACTIVAR EL BOTÓN
-      // 'event.complete' es true SOLO si número, fecha y CVC son válidos.
       this.stripeReady = event.complete;
-      
-      // 3. ¡IMPORTANTE! Forzar a Angular a revisar la vista para habilitar el botón
       this.cdr.detectChanges(); 
     });
   }
 
   async confirmarPago() {
     this.procesando = true;
-    this.errorGeneral = '';
-
-    // Enviar pago a Stripe
     const result = await this.stripe.confirmCardPayment(this.clientSecret, {
-      payment_method: {
-        card: this.card,
-        billing_details: {
-          email: this.datosPago.payload.email
-        }
-      }
+      payment_method: { card: this.card }
     });
 
     if (result.error) {
-      // Fallo (Fondos insuficientes, tarjeta rechazada...)
       this.errorGeneral = result.error.message;
       this.procesando = false;
       this.cdr.detectChanges();
-    } else {
-      // Éxito
-      if (result.paymentIntent.status === 'succeeded') {
-        this.mensajeExito = '¡Pago realizado correctamente!';
-        this.cdr.detectChanges();
-        // Avisar a nuestro backend para activar el servicio/canción
-        this.finalizarOperacionEnBackend(result.paymentIntent.id);
-      }
+    } else if (result.paymentIntent.status === 'succeeded') {
+      this.mensajeExito = '¡Pago realizado!';
+      this.cdr.detectChanges();
+      this.finalizarOperacionEnBackend(result.paymentIntent.id);
     }
   }
 
   finalizarOperacionEnBackend(transactionId: string) {
-    let url = '';
-    
-    if (this.datosPago.tipo === 'CANCION') {
-      url = 'http://localhost:8080/api/gramola/cola/add';
-    } else if (this.datosPago.tipo === 'SUSCRIPCION') {
-      url = 'http://localhost:8080/api/bares/suscripcion';
-    }
+    let url = this.datosPago.tipo === 'CANCION' 
+              ? 'http://localhost:8080/api/gramola/cola/add' 
+              : 'http://localhost:8080/api/bares/suscripcion';
 
-    const finalPayload = { 
-      ...this.datosPago.payload, 
-      stripeTransactionId: transactionId 
-    };
+    const finalPayload = { ...this.datosPago.payload, stripeTransactionId: transactionId };
 
     this.http.post(url, finalPayload).subscribe({
-      next: () => {
-        // Retardo para que el usuario vea el check verde
-        setTimeout(() => this.cerrarYRedirigir(), 2000);
-      },
-      error: (err) => {
-        this.errorGeneral = 'Pago cobrado, pero error activando el servicio. Contacta soporte.';
+      next: () => setTimeout(() => this.cerrarYRedirigir(), 1500),
+      error: () => {
+        this.errorGeneral = 'Error activando el servicio.';
         this.procesando = false;
       }
     });
@@ -194,15 +136,11 @@ export class PasarelaPagoComponent implements OnInit, OnDestroy {
 
   cerrarYRedirigir() {
     this.pagoState.clear();
-    
-    if (this.isModal) {
-      this.close.emit(true);
-    } else {
-      if (this.datosPago.tipo === 'CANCION') {
-          this.router.navigate(['/gramola']);
-      } else {
-          this.router.navigate(['/login']); 
-      }
+    if (this.isModal) this.close.emit(true);
+    else {
+      this.datosPago.tipo === 'CANCION' 
+        ? this.router.navigate(['/gramola']) 
+        : this.router.navigate(['/login']); 
     }
   }
 
