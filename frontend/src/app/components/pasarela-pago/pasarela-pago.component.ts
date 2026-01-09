@@ -82,10 +82,10 @@ export class PasarelaPagoComponent implements OnInit, OnDestroy {
     
     const style = {
       base: {
-        color: '#ffffff',
+        color: '#070606ff',
         fontFamily: '"Helvetica Neue", Helvetica, sans-serif',
         fontSize: '16px',
-        '::placeholder': { color: '#aab7c4' }
+        '::placeholder': { color: '#090909ff' }
       }
     };
 
