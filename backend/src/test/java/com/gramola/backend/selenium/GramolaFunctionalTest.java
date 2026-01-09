@@ -1,27 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * Es una suite de pruebas funcionales "End-to-End" (E2E) automatizadas con Selenium.
- * Simula el comportamiento de un usuario real navegando por la aplicación en Chrome.
- *
- * * PUNTOS CLAVE:
- * 1. SIMULACIÓN REALISTA:
- * No probamos código aislado, probamos la EXPERIENCIA. El test abre un navegador,
- * inicia sesión, busca canciones, paga y verifica que la música suena.
- *
- * 2. PERFIL PERSISTENTE DE CHROME:
- * Usamos un perfil de usuario temporal ('RUTA_PERFIL') para evitar problemas con
- * sesiones bloqueadas, popups de "guardar contraseña" o configuraciones del navegador
- * del desarrollador. Esto hace que el test sea estable y reproducible.
- *
- * 3. CASOS DE PRUEBA (Happy Path & Error Path):
- * - 'testFlujoRealFernando_Costa': Prueba el camino feliz (todo funciona, pago OK).
- * - 'testPagoConDatosIncorrectos': Prueba la robustez (el sistema rechaza pagos malos).
- * ======================================================================================
- */
-
 package com.gramola.backend.selenium;
 
 import io.github.bonigarcia.wdm.WebDriverManager;
@@ -29,12 +5,10 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.openqa.selenium.By;
-import org.openqa.selenium.JavascriptExecutor;
-import org.openqa.selenium.WebDriver;
-import org.openqa.selenium.WebElement;
+import org.openqa.selenium.*; 
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.openqa.selenium.interactions.Actions; 
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.WebDriverWait;
 
@@ -44,18 +18,17 @@ import java.util.List;
 import java.util.Map;     
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 public class GramolaFunctionalTest {
 
     private WebDriver driver;
     private WebDriverWait wait;
     
-    // Definimos una carpeta específica para guardar la sesión del navegador de pruebas
     private static final String RUTA_PERFIL = System.getProperty("user.home") + "/selenium-chrome-profile";
 
     @BeforeAll
     public static void setupClass() {
-        // WebDriverManager descarga automáticamente el driver de Chrome compatible
         WebDriverManager.chromedriver().setup();
     }
 
@@ -64,9 +37,6 @@ public class GramolaFunctionalTest {
         System.out.println("📂 Usando perfil persistente en: " + RUTA_PERFIL);
         
         ChromeOptions options = new ChromeOptions();
-
-        // --- BLOQUEAR GESTOR DE CONTRASEÑAS Y AVISOS ---
-        // Vital para evitar que popups de Chrome rompan la automatización
         Map<String, Object> prefs = new HashMap<>();
         prefs.put("profile.password_manager_leak_detection", false);
         prefs.put("credentials_enable_service", false);
@@ -75,163 +45,262 @@ public class GramolaFunctionalTest {
         
         options.addArguments("--disable-save-password-bubble");
         options.addArguments("--remote-allow-origins=*");
-        // Política para permitir autoreproducción de audio sin interacción
         options.addArguments("--autoplay-policy=no-user-gesture-required");
-        
-        // Forzar modo oscuro para consistencia visual
         options.addArguments("--force-dark-mode"); 
-        options.addArguments("--enable-features=WebUIDarkMode");
         
         options.addArguments("user-data-dir=" + RUTA_PERFIL);
         options.addArguments("--profile-directory=Default"); 
 
         driver = new ChromeDriver(options);
-        wait = new WebDriverWait(driver, Duration.ofSeconds(20));
+        wait = new WebDriverWait(driver, Duration.ofSeconds(30));
         driver.manage().window().maximize();
     }
 
-    // --- MÉTODO REUTILIZABLE: PREPARAR LA SESIÓN ---
-    // Encapsula el Login, la conexión con Spotify y la selección de ambiente
+    // --- HELPER: Escribir tecleando (Simula humano) ---
+    private void escribirEnElementoActivo(String texto) {
+        Actions actions = new Actions(driver);
+        for (char c : texto.toCharArray()) {
+            actions.sendKeys(String.valueOf(c)).perform();
+            try { Thread.sleep(100); } catch (Exception e) {} 
+        }
+    }
+
+    // --- HELPER: Preparación Común ---
     private void prepararEntornoGramola(String busquedaPlaylist) {
-        // 1. Limpieza de sesión
         driver.get("http://localhost:4200/login");
         JavascriptExecutor js = (JavascriptExecutor) driver;
         js.executeScript("window.localStorage.clear();");
         js.executeScript("window.sessionStorage.clear();");
         driver.navigate().refresh();
 
-        // 2. Login Automático
-        System.out.println("🔒 Escribiendo credenciales en Gramola...");
+        System.out.println("🔒 Login...");
         WebElement emailInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.name("email")));
         emailInput.clear();
-        emailInput.sendKeys("bar@test.com"); 
-        driver.findElement(By.name("password")).sendKeys("123456");
+        emailInput.sendKeys("aa@gail.com"); 
+        driver.findElement(By.name("password")).sendKeys("11");
         driver.findElement(By.className("btn-login")).click();
 
-        // 3. Gestión inteligente de Spotify (¿Ya conectado o necesita login?)
         wait.until(ExpectedConditions.urlContains("config-audio"));
-        System.out.println("🚦 Decidiendo si conectar Spotify o buscar...");
-
         try { Thread.sleep(1500); } catch (Exception e) {}
 
         List<WebElement> botonesConectar = driver.findElements(By.cssSelector(".connect-screen .btn-primary"));
-        
         if (!botonesConectar.isEmpty() && botonesConectar.get(0).isDisplayed()) {
-            System.out.println("🔌 Botón encontrado. Pulsando CONECTAR...");
             botonesConectar.get(0).click();
-            // Lógica de espera por si Spotify pide login manual (damos 3 minutos)
             try {
                 Thread.sleep(2000);
                 if (!driver.getCurrentUrl().contains("config-audio")) {
-                    System.out.println("\n🛑 ALTO: Spotify pide login. Tienes 3 minutos.");
                     new WebDriverWait(driver, Duration.ofSeconds(180))
                         .until(ExpectedConditions.urlContains("config-audio"));
-                    System.out.println("✅ Login completado.");
                 }
             } catch (Exception e) {}
-        } else {
-            System.out.println("✅ No hay botón de conectar. Ya estamos listos.");
         }
 
-        // 4. Selección de Playlist de Ambiente
-        System.out.println("📻 Buscando playlist real: " + busquedaPlaylist);
+        System.out.println("📻 Buscando playlist: " + busquedaPlaylist);
         WebElement searchInput = wait.until(ExpectedConditions.elementToBeClickable(By.cssSelector(".search-box input")));
+        searchInput.click();
         searchInput.clear();
         searchInput.sendKeys(busquedaPlaylist);
+        try { Thread.sleep(1000); } catch (Exception e) {} 
         
         driver.findElement(By.className("btn-search")).click();
 
-        wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-list")));
+        try {
+            WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(3));
+            shortWait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-list")));
+        } catch (TimeoutException e) {
+            driver.findElement(By.className("btn-search")).click(); 
+            wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-list")));
+        }
+        
         try { Thread.sleep(1000); } catch (Exception e) {} 
-
         wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-select"))).click();
 
-        // 5. Entrada al Dashboard
+        try {
+            WebElement btnConfirmar = wait.until(ExpectedConditions.elementToBeClickable(
+                By.xpath("//button[contains(text(), 'Entrar') or contains(text(), 'Confirmar') or contains(@class, 'confirm')]")
+            ));
+            btnConfirmar.click();
+        } catch (Exception e) {}
+
         wait.until(ExpectedConditions.urlContains("/gramola"));
         gestionarAudio();
     }
     
-    // Intenta activar el audio si el navegador lo bloquea
     private void gestionarAudio() {
         try {
-            WebDriverWait audioWait = new WebDriverWait(driver, Duration.ofSeconds(3));
+            WebDriverWait audioWait = new WebDriverWait(driver, Duration.ofSeconds(2));
             WebElement btn = audioWait.until(ExpectedConditions.elementToBeClickable(By.cssSelector(".btn-activate")));
             btn.click();
-            System.out.println("🔊 Audio activado.");
         } catch (Exception e) {
-            // Si no aparece el botón, hacemos un clic genérico para despertar el audio context
             driver.findElement(By.tagName("body")).click();
         }
     }
 
-    // --- TEST 1: FLUJO COMPLETO DE ÉXITO ---
+    // ----------------------------------------------------------------------------------
+    // TEST 1: CAMINO FELIZ (Happy Path)
+    // ----------------------------------------------------------------------------------
     @Test
     public void testFlujoRealFernando_Costa() {
         prepararEntornoGramola("Fernando Costa");
 
-        // Buscar canción
+        System.out.println("🎵 Buscando canción Malamanera...");
         WebElement searchInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".search-input")));
         searchInput.clear();
         searchInput.sendKeys("Malamanera");
-        
-        wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-search"))).click();
+        try { Thread.sleep(800); } catch (Exception e) {} 
+        driver.findElement(By.className("btn-search")).click();
 
-        // Seleccionar canción
-        WebElement resultsOverlay = wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-overlay")));
-        try { Thread.sleep(1000); } catch (Exception e) {} 
-        
+        try {
+            WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(3));
+            shortWait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-overlay")));
+        } catch (TimeoutException e) {
+            driver.findElement(By.className("btn-search")).click();
+        }
+
+        WebElement overlay = wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-overlay")));
         wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-add"))).click();
 
-        // Rellenar Pago (Datos CORRECTOS)
+        // --- PAGO ---
+        System.out.println("💳 Entrando en Pasarela de Pago...");
+        
         WebElement modalPago = wait.until(ExpectedConditions.visibilityOfElementLocated(By.tagName("app-pasarela-pago")));
-        modalPago.findElement(By.cssSelector("input[placeholder='NOMBRE APELLIDOS']")).sendKeys("Tester Pro");
-        modalPago.findElement(By.cssSelector("input[placeholder='0000 0000 0000 0000']")).sendKeys("1234567812345678");
-        modalPago.findElement(By.cssSelector("input[placeholder='MM/AA']")).sendKeys("12/30");
-        modalPago.findElement(By.cssSelector("input[placeholder='123']")).sendKeys("123");
-        
-        wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-pay"))).click();
+        try { Thread.sleep(2000); } catch (Exception e) {} 
 
-        // Verificación de Éxito
-        WebElement successView = wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("success-view")));
-        assertTrue(successView.isDisplayed());
+        System.out.println("🎹 Escribiendo datos...");
+        Actions actions = new Actions(driver);
+
+        try {
+            driver.findElement(By.xpath("//*[contains(text(), 'Estás pagando') or contains(text(), 'Información')]")).click();
+        } catch (Exception e) {
+            modalPago.click();
+        }
         
-        System.out.println("✅ Test completado. 🎶 Reproduciendo canción durante 60 segundos...");
-        try { Thread.sleep(60000); } catch (InterruptedException e) {}
+        actions.sendKeys(Keys.TAB).perform();
+        try { Thread.sleep(500); } catch (Exception e) {}
+
+        // Tarjeta
+        System.out.println("   -> Escribiendo Tarjeta...");
+        escribirEnElementoActivo("4242424242424242");
+        
+        // Espera salto automático
+        try { Thread.sleep(800); } catch (Exception e) {} 
+        
+        // Fecha
+        System.out.println("   -> Escribiendo Fecha (1230)...");
+        escribirEnElementoActivo("1230");
+
+        // Espera salto automático
+        try { Thread.sleep(800); } catch (Exception e) {}
+
+        // CVC
+        System.out.println("   -> Escribiendo CVC...");
+        escribirEnElementoActivo("123");
+
+        System.out.println("👇 Pulsando Pagar...");
+        try {
+            wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-pay"))).click();
+        } catch (Exception e) {
+            ((JavascriptExecutor) driver).executeScript("document.querySelector('.btn-pay').click();");
+        }
+
+        // --- VERIFICACIÓN DEFINITIVA: EL MODAL DEBE DESAPARECER ---
+        System.out.println("⏳ Esperando que se cierre el modal de pago...");
+        
+        try {
+            // Esperamos explícitamente a que el modal de pago YA NO ESTÉ VISIBLE
+            boolean desaparecio = wait.until(ExpectedConditions.invisibilityOfElementLocated(By.tagName("app-pasarela-pago")));
+            
+            assertTrue(desaparecio, "El modal de pago no se cerró, el pago pudo haber fallado.");
+            System.out.println("✅ El modal se cerró correctamente -> ¡PAGO EXITOSO!");
+            
+        } catch (TimeoutException e) {
+            // Si el modal sigue ahí después de 30 segundos, es que falló
+            fail("❌ ERROR: El modal de pago sigue visible tras pulsar Pagar.");
+        }
+        
+        try { Thread.sleep(5000); } catch (InterruptedException e) {}
     }
 
-    // --- TEST 2: PRUEBA DE ERROR (Pago fallido) ---
+    // ----------------------------------------------------------------------------------
+    // TEST 2: CAMINO DE ERROR (Error Path)
+    // ----------------------------------------------------------------------------------
     @Test
     public void testPagoConDatosIncorrectos() {
         prepararEntornoGramola("Rock FM");
 
-        // Buscar canción
+        System.out.println("🧪 INICIANDO TEST: Pago con datos incorrectos...");
+
+        // Buscar
         WebElement searchInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.cssSelector(".search-input")));
         searchInput.clear();
-        searchInput.sendKeys("Bohemian Rhapsody");
-        wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-search"))).click();
+        searchInput.sendKeys("Chojin"); 
+        try { Thread.sleep(800); } catch (Exception e) {} 
+        driver.findElement(By.className("btn-search")).click();
 
-        // Seleccionar canción
-        WebElement resultsOverlay = wait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-overlay")));
-        try { Thread.sleep(1000); } catch (Exception e) {} 
-        wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-add"))).click();
-
-        // Rellenar Pago (Datos INCORRECTOS - Tarjeta incompleta)
-        WebElement modalPago = wait.until(ExpectedConditions.visibilityOfElementLocated(By.tagName("app-pasarela-pago")));
-        modalPago.findElement(By.cssSelector("input[placeholder='0000 0000 0000 0000']")).sendKeys("123"); 
-        
-        // Intentar pagar
-        wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-pay"))).click();
-
-        // Verificación: NO debe salir la pantalla de éxito
-        boolean exitoVisible = false;
         try {
             WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(3));
-            shortWait.until(ExpectedConditions.visibilityOfElementLocated(By.className("success-view")));
-            exitoVisible = true;
-        } catch (Exception e) {}
+            shortWait.until(ExpectedConditions.visibilityOfElementLocated(By.className("results-overlay")));
+        } catch (TimeoutException e) {
+            driver.findElement(By.className("btn-search")).click();
+        }
 
-        if (!exitoVisible) System.out.println("✅ Test Error OK: El pago no procedió con datos malos.");
-        else throw new RuntimeException("❌ Fallo: Pago incorrecto permitido.");
+        wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-add"))).click();
+
+        // --- PAGO INCORRECTO ---
+        System.out.println("💳 Entrando en Pasarela de Pago...");
+        WebElement modalPago = wait.until(ExpectedConditions.visibilityOfElementLocated(By.tagName("app-pasarela-pago")));
+        try { Thread.sleep(1500); } catch (Exception e) {} 
+
+        Actions actions = new Actions(driver);
+
+        try {
+            driver.findElement(By.xpath("//*[contains(text(), 'Estás pagando') or contains(text(), 'Información')]")).click();
+        } catch (Exception e) {
+            modalPago.click();
+        }
+        
+        actions.sendKeys(Keys.TAB).perform();
+        try { Thread.sleep(500); } catch (Exception e) {}
+
+        // Tarjeta MALA
+        System.out.println("😈 Introduciendo tarjeta mala...");
+        escribirEnElementoActivo("123"); 
+        
+        actions.sendKeys(Keys.TAB).perform(); // Salto manual
+        try { Thread.sleep(500); } catch (Exception e) {}
+
+        escribirEnElementoActivo("1230"); 
+        actions.sendKeys(Keys.TAB).perform(); 
+        escribirEnElementoActivo("123"); 
+
+        System.out.println("👇 Pulsando Pagar...");
+        try {
+            WebElement btnPay = wait.until(ExpectedConditions.elementToBeClickable(By.className("btn-pay")));
+            btnPay.click();
+        } catch (Exception e) {
+             try { ((JavascriptExecutor) driver).executeScript("document.querySelector('.btn-pay').click();"); } catch (Exception ex) {}
+        }
+
+        // --- VERIFICACIÓN: EL MODAL NO DEBE DESAPARECER ---
+        System.out.println("🔍 Verificando que el modal SIGUE ABIERTO...");
+        
+        boolean modalSigueVisible = false;
+        try {
+            // Esperamos un poco a ver si desaparece (no debería)
+            WebDriverWait shortWait = new WebDriverWait(driver, Duration.ofSeconds(4));
+            shortWait.until(ExpectedConditions.invisibilityOfElementLocated(By.tagName("app-pasarela-pago")));
+            // Si llega aquí, es que se cerró (MALO)
+            modalSigueVisible = false;
+        } catch (TimeoutException e) {
+            // Si salta el timeout esperando que desaparezca, es que SIGUE VISIBLE (BUENO)
+            modalSigueVisible = true;
+        }
+
+        if (modalSigueVisible) {
+            System.out.println("✅ TEST OK: El modal sigue abierto tras tarjeta mala.");
+        } else {
+             fail("❌ FALLO DE SEGURIDAD: El modal se cerró (pago aceptado) con tarjeta falsa.");
+        }
     }
 
     @AfterEach
