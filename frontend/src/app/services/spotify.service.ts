@@ -7,56 +7,13 @@ export class SpotifyConnectService {
   private http = inject(HttpClient);
   private apiUrl = 'http://localhost:8080/api/spotify'; 
 
-  /**
-   * Genera un state aleatorio (OAuth) y lo guarda en sessionStorage.
-   * Se usa para validar en el /callback que Spotify devuelve el mismo state.
-   */
-  generarYGuardarState(): string {
-    const state = this.randomState(16);
-    sessionStorage.setItem('spotify_oauth_state', state);
-    return state;
-  }
-
-  /** Devuelve el state guardado previamente (o null si no existe). */
-  getStateGuardado(): string | null {
-    return sessionStorage.getItem('spotify_oauth_state');
-  }
-
-  /** Limpia el state guardado (se recomienda tras un callback válido). */
-  limpiarStateGuardado(): void {
-    sessionStorage.removeItem('spotify_oauth_state');
-  }
-
-  private randomState(length: number): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let out = '';
-    // Preferimos crypto si está disponible
-    const cryptoObj: Crypto | undefined = (globalThis as any).crypto;
-    if (cryptoObj && cryptoObj.getRandomValues) {
-      const bytes = new Uint8Array(length);
-      cryptoObj.getRandomValues(bytes);
-      for (let i = 0; i < length; i++) out += chars[bytes[i] % chars.length];
-      return out;
-    }
-    for (let i = 0; i < length; i++) out += chars[Math.floor(Math.random() * chars.length)];
-    return out;
-  }
-
   getAuthUrl(userId: string | number): Observable<any> {
-    // El backend construye una URL de Spotify que incluye state="{barId}_{random}".
-    // Nosotros también generamos un state random y lo guardamos para validar el callback.
-    // Para no tocar demasiado el backend, le mandamos el barId como siempre.
-    // La parte "random" la validamos en /callback.
     const params = new HttpParams().set('barId', userId.toString());
     return this.http.get(`${this.apiUrl}/auth-url`, { params });
   }
 
-  /**
-   * Envía el code al backend para que haga el intercambio por tokens.
-   * IMPORTANTE: aquí NO enviamos el state random, enviamos el barId.
-   */
-  enviarCodigoAlBackend(code: string, barId: string | number): Observable<any> {
-    const params = new HttpParams().set('code', code).set('barId', barId.toString());
+  enviarCodigoAlBackend(code: string, userId: string | number): Observable<any> {
+    const params = new HttpParams().set('code', code).set('state', userId.toString());
     return this.http.get(`${this.apiUrl}/callback`, { params });
   }
 
