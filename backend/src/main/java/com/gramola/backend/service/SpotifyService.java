@@ -29,7 +29,6 @@ public class SpotifyService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    // Generador de cadenas aleatorias para el parámetro 'state'
     private String generarStateAleatorio() {
         String caracteres = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         SecureRandom random = new SecureRandom();
@@ -50,10 +49,12 @@ public class SpotifyService {
 
         String scope = "streaming user-read-private user-read-email user-modify-playback-state user-read-playback-state playlist-read-private";
         
-        // State aleatorio concatenado con barId
+        // 1. Generar y GUARDAR el state
         String stateAleatorio = barId + "_" + generarStateAleatorio();
+        
+        bar.setTempState(stateAleatorio);
+        barRepository.save(bar);
 
-        // CAMBIO: Usamos fromUriString que es más compatible y evitamos el error de compilación
         return UriComponentsBuilder.fromUriString("https://accounts.spotify.com/authorize")
                 .queryParam("response_type", "code")
                 .queryParam("client_id", clientId)
@@ -64,8 +65,21 @@ public class SpotifyService {
                 .toUriString();
     }
 
-    public void exchangeCodeForToken(String code, Long barId) {
+    // 2. Validar el state recibido
+    public void exchangeCodeForToken(String code, Long barId, String stateRecibido) {
         Bar bar = barRepository.findById(barId).orElseThrow(() -> new RuntimeException("Bar no encontrado"));
+        
+        // SEGURIDAD: Si el state no coincide o está vacío, es un error/ataque
+        if (bar.getTempState() == null || !bar.getTempState().equals(stateRecibido)) {
+            bar.setTempState(null); // Borrar por seguridad
+            barRepository.save(bar);
+            throw new SecurityException("State inválido o sesión caducada.");
+        }
+
+        // State correcto: Lo borramos y guardamos ANTES de llamar a Spotify
+        bar.setTempState(null);
+        barRepository.save(bar);
+
         processTokenRequest(code, null, "authorization_code", bar);
     }
 
@@ -95,7 +109,10 @@ public class SpotifyService {
             Map<String, Object> resp = response.getBody();
             if (resp != null) {
                 bar.setSpotifyAccessToken((String) resp.get("access_token"));
-                bar.setSpotifyTokenExpiresAt(LocalDateTime.now().plusSeconds(Long.parseLong(resp.get("expires_in").toString())));
+                Object expiresIn = resp.get("expires_in");
+                if (expiresIn != null) {
+                    bar.setSpotifyTokenExpiresAt(LocalDateTime.now().plusSeconds(((Number) expiresIn).longValue()));
+                }
                 if (resp.containsKey("refresh_token")) {
                     bar.setSpotifyRefreshToken((String) resp.get("refresh_token"));
                 }

@@ -18,14 +18,25 @@ public class SpotifyController {
 
     @GetMapping("/auth-url")
     public ResponseEntity<?> getAuthUrl(@RequestParam Long barId) {
-        return ResponseEntity.ok(Collections.singletonMap("url", spotifyService.getAuthorizationUrl(barId)));
+        try {
+            return ResponseEntity.ok(Collections.singletonMap("url", spotifyService.getAuthorizationUrl(barId)));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
+        }
     }
 
     @GetMapping("/callback")
     public ResponseEntity<?> callback(@RequestParam String code, @RequestParam String state) {
         try {
-            Long barId = Long.valueOf(state);
-            spotifyService.exchangeCodeForToken(code, barId);
+            // CORRECCIÓN: Separar el ID del texto aleatorio
+            String[] partes = state.split("_");
+            if (partes.length < 2) throw new RuntimeException("Formato de state inválido");
+            
+            Long barId = Long.valueOf(partes[0]);
+            
+            // Pasar el state completo para validación
+            spotifyService.exchangeCodeForToken(code, barId, state);
+            
             return ResponseEntity.ok(Collections.singletonMap("mensaje", "Conectado correctamente"));
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
@@ -42,7 +53,6 @@ public class SpotifyController {
         }
     }
 
-    // ENDPOINT PARA CARGA DE DISPOSITIVOS
     @GetMapping("/devices")
     public ResponseEntity<?> getDevices(@RequestParam Long barId) {
         try {

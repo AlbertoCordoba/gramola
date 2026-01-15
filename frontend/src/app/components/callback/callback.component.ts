@@ -18,15 +18,27 @@ export class CallbackComponent implements OnInit {
   private router = inject(Router);
   private spotifyService = inject(SpotifyConnectService);
 
+  // Variable para evitar doble llamada
+  private procesando = false;
+
   ngOnInit() {
     this.route.queryParams.subscribe(params => {
       const code = params['code'];
-      const userId = params['state'];
+      const state = params['state'];
 
-      if (code && userId) {
-        this.spotifyService.enviarCodigoAlBackend(code, userId).subscribe({
-          next: () => this.router.navigate(['/config-audio'], { queryParams: { status: 'success' } }),
-          error: () => this.router.navigate(['/config-audio'], { queryParams: { status: 'error' } })
+      if (this.procesando) return; // Si ya estamos trabajando, ignorar
+
+      if (code && state) {
+        this.procesando = true; // Bloqueamos nuevas llamadas
+
+        this.spotifyService.enviarCodigoAlBackend(code, state).subscribe({
+          next: () => {
+            this.router.navigate(['/config-audio'], { queryParams: { status: 'success' } });
+          },
+          error: () => {
+            this.procesando = false;
+            this.router.navigate(['/config-audio'], { queryParams: { status: 'error' } });
+          }
         });
       } else {
         this.router.navigate(['/login']);
