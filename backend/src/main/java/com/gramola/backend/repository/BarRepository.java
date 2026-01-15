@@ -1,23 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * 'BarRepository' es la capa de acceso a datos para la entidad 'Bar'.
- * Actúa como un traductor automático entre Java y SQL.
- *
- * * PUNTOS CLAVE (DERIVED QUERY METHODS):
- * 1. MAGIA DE SPRING DATA:
- * No hace falta escribir "SELECT * FROM bares WHERE email = ...".
- * Al definir un método con el nombre 'findByEmail', Spring genera la consulta SQL
- * automáticamente en tiempo de ejecución. Esto reduce errores y código repetitivo.
- *
- * 2. OPTIONAL<T>:
- * Usamos 'Optional' en los retornos para evitar los temidos 'NullPointerException'.
- * Nos obliga a comprobar siempre si el usuario existe antes de usarlo.
- * ======================================================================================
- */
-
 package com.gramola.backend.repository;
 
 import com.gramola.backend.model.Bar;

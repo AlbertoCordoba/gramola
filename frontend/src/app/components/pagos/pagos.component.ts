@@ -1,28 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * Es la pantalla de selección de suscripciones ('PagosComponent').
- * Permite al dueño del bar elegir entre pagar mensual o anualmente para activar su cuenta.
- *
- * * PUNTOS CLAVE:
- * 1. PRECIOS DINÁMICOS (Backend Driven):
- * Los precios NO están escritos en el código ("50€"). Se cargan desde la base de datos
- * a través de una petición HTTP al Backend ('/api/bares/precios').
- * Esto permite al administrador del negocio cambiar tarifas sin redesplegar la app.
- *
- * 2. GESTIÓN DE ESTADO ENTRE PÁGINAS (PagoStateService):
- * Cuando el usuario elige un plan, no pasamos los datos por la URL (inseguro y feo).
- * Usamos un servicio compartido ('PagoStateService') para guardar temporalmente la
- * intención de compra antes de navegar a la pasarela de pago.
- *
- * 3. LECTURA DE PARÁMETROS (ActivatedRoute):
- * Detectamos si el usuario viene rebotado de la verificación de email (param '?verificado=true')
- * para mostrar feedback o activar lógicas específicas.
- * ======================================================================================
- */
-
 import { Component, inject, OnInit } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { Router, ActivatedRoute } from '@angular/router';

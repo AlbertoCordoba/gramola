@@ -1,23 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * Esta entidad representa la configuración dinámica de la plataforma.
- * Su objetivo es evitar el "Hardcoding" (escribir valores fijos en el código Java).
- *
- * * PUNTOS CLAVE:
- * 1. FLEXIBILIDAD:
- * Si mañana queremos subir el precio de la canción de 0.50€ a 1.00€, o cambiar el
- * precio de la suscripción, NO tenemos que tocar el código ni recompilar el servidor.
- * Simplemente cambiamos el valor en esta tabla de la base de datos y se aplica al instante.
- *
- * 2. CLAVE ÚNICA:
- * Usamos el campo 'clave' (ej: "PRECIO_CANCION", "SUSCRIPCION_MENSUAL") como
- * identificador único para buscar estos valores desde el servicio.
- * ======================================================================================
- */
-
 package com.gramola.backend.model;
 
 import jakarta.persistence.*;
@@ -42,7 +22,7 @@ public class ConfiguracionPrecios {
 
     // --- VALOR MONETARIO ---
     // Usamos BigDecimal en lugar de Double para dinero.
-    // NOTA DEFENSA: "En sistemas financieros, 'Double' puede tener errores de redondeo
+    // "En sistemas financieros, 'Double' puede tener errores de redondeo
     // (coma flotante). BigDecimal es la forma correcta y precisa de manejar divisas en Java."
     @Column(name = "valor")
     private BigDecimal valor;

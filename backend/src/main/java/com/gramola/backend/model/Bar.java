@@ -47,13 +47,12 @@ public class Bar {
     @Column(name = "firma_imagen", columnDefinition = "LONGBLOB")
     private byte[] firmaImagen;
 
-    // --- NUEVO: Credenciales de la App Spotify del Bar ---
+    //Credenciales de la App Spotify del Bar
     @Column(name = "spotify_client_id")
     private String clientId;
 
     @Column(name = "spotify_client_secret")
     private String clientSecret; // Se guardará CIFRADO
-    // ----------------------------------------------------
 
     @Column(name = "spotify_access_token", length = 2048)
     private String spotifyAccessToken;

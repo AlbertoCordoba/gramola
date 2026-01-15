@@ -1,23 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * Gestiona el acceso a la tabla de canciones. Aquí reside la lógica de ordenamiento
- * de la Gramola.
- *
- * * PUNTOS CLAVE (LÓGICA DE NEGOCIO EN BD):
- * 1. COLA DE REPRODUCCIÓN (FIFO - First In, First Out):
- * El método para obtener la cola ordena por 'FechaSolicitud ASC' (Ascendente).
- * Esto garantiza que la canción que se pidió primero, suene primero. Es lo justo.
- *
- * 2. HISTORIAL (LIFO - Last In, First Out):
- * El método para el historial ordena por 'FechaSolicitud DESC' (Descendente) y usa
- * 'Top5' para limitar resultados. Así mostramos las últimas canciones que sonaron,
- * no las de hace 3 años.
- * ======================================================================================
- */
-
 package com.gramola.backend.repository;
 
 import com.gramola.backend.model.CancionSolicitada;

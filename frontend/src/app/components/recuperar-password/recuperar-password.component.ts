@@ -1,32 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * Es el primer paso del flujo de recuperación de contraseña ('RecuperarPasswordComponent').
- * Su única función es pedir el email al usuario y solicitar al Backend que envíe
- * un enlace mágico de restablecimiento.
- *
- * * PUNTOS CLAVE:
- * 1. UX/UI (Gestión de Estados):
- * Manejamos tres estados visuales claros mediante variables booleanas:
- * - Formulario ('!enviado'): El usuario escribe su email.
- * - Cargando ('cargando'): El botón se bloquea y muestra feedback mientras el servidor procesa.
- * - Éxito ('enviado'): Ocultamos el formulario y mostramos un mensaje de confirmación
- * con una cuenta atrás visual antes de redirigir.
- *
- * 2. COMUNICACIÓN HTTP DIRECTA:
- * Al ser una operación muy específica y única, hacemos la llamada 'this.http.post'
- * directamente aquí en lugar de crear un método en un servicio genérico, manteniendo
- * el código localizado y simple (Principio KISS).
- *
- * 3. CONTROL DE CAMBIOS (ChangeDetectorRef):
- * Al igual que en otros componentes críticos, forzamos la actualización de la vista
- * ('cdr.detectChanges()') tras la respuesta asíncrona del servidor para asegurar
- * que el mensaje de éxito aparezca instantáneamente sin "lag".
- * ======================================================================================
- */
-
 import { Component, inject, ChangeDetectorRef } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';

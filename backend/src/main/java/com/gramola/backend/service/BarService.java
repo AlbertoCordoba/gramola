@@ -61,7 +61,6 @@ public class BarService {
                 throw new Exception("El email ya existe y está activo");
             }
         }
-        // -----------------------------------------------------
 
         if (!datos.getPassword().equals(datos.getConfirmPassword())) {
             throw new Exception("Las contraseñas no coinciden");
@@ -100,7 +99,7 @@ public class BarService {
 
         barRepository.save(bar);
         
-        // Enviar correo con el token generado [cite: 37, 38]
+        // Enviar correo con el token generado
         emailService.sendWelcomeEmail(bar.getEmail(), token);
     }
 

@@ -33,7 +33,7 @@ public class PaymentService {
     }
 
     public StripeTransaction prepay(String email, String tipoPago) throws StripeException {
-        // 1. Obtención dinámica del precio (Requisito 2.4 del Doc)
+        // 1. Obtención dinámica del precio
         String claveBD = tipoPago.equalsIgnoreCase("CANCION") ? "PRECIO_CANCION" : "SUSCRIPCION_MENSUAL";
         
         BigDecimal precioBD = preciosRepository.findAll().stream()

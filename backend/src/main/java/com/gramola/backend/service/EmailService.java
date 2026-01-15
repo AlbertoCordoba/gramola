@@ -1,28 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * 'EmailService' centraliza todas las notificaciones por correo electrónico de la app.
- * Su función es mantener al usuario informado en momentos críticos (registro y seguridad).
- *
- * * PUNTOS CLAVE:
- * 1. INYECCIÓN DE DEPENDENCIAS (JavaMailSender):
- * Usamos la librería estándar 'spring-boot-starter-mail' para abstraernos de la
- * complejidad del protocolo SMTP. Configuramos el servidor (Mailtrap en desarrollo)
- * en el archivo 'application.properties'.
- *
- * 2. HTML ENRIQUECIDO (Text Blocks):
- * En lugar de enviar texto plano feo, enviamos correos HTML profesionales con estilos
- * CSS integrados. Usamos la característica "Text Blocks" de Java 17 (""") para
- * escribir el HTML de forma limpia y legible dentro del código Java.
- *
- * 3. CASOS DE USO:
- * - Bienvenida: Envía el enlace de verificación de cuenta.
- * - Seguridad: Envía el enlace temporal para restablecer la contraseña.
- * ======================================================================================
- */
-
 package com.gramola.backend.service;
 
 import jakarta.mail.MessagingException;

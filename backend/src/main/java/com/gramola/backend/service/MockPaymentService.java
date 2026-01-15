@@ -1,24 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * 'MockPaymentService' es un simulador de pasarela de pagos (como Stripe o PayPal).
- * En un entorno real de producción, aquí conectaríamos con la API del banco.
- *
- * * PUNTOS CLAVE:
- * 1. LATENCIA ARTIFICIAL (Thread.sleep):
- * Los pagos reales nunca son instantáneos. Usamos 'Thread.sleep(2000)' para simular
- * los 2 segundos que tarda el banco en responder. Esto nos permite probar la
- * "experiencia de usuario" de espera (spinners de carga) en el Frontend.
- *
- * 2. SIMULACIÓN DE ERRORES (Testing):
- * Aceptamos un parámetro 'simularError'. Esto es vital para el QA (Quality Assurance),
- * ya que nos permite probar qué pasa si el usuario no tiene fondos o la tarjeta es
- * rechazada, sin tener que usar tarjetas de crédito reales erróneas.
- * ======================================================================================
- */
-
 package com.gramola.backend.service;
 
 import org.springframework.stereotype.Service;

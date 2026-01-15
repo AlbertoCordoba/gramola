@@ -1,12 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * Componente Raíz. Contiene la lógica para mostrar/ocultar elementos de navegación
- * basándose en la URL actual y el estado de la sesión.
- * ======================================================================================
- */
-
 import { Component, inject, OnInit } from '@angular/core';
 import { Router, RouterOutlet, NavigationEnd } from '@angular/router';
 import { CommonModule } from '@angular/common';

@@ -42,7 +42,7 @@ public class SpotifyController {
         }
     }
 
-    // --- NUEVO: ENDPOINT PARA CARGA DE DISPOSITIVOS (Figura 27) ---
+    // ENDPOINT PARA CARGA DE DISPOSITIVOS
     @GetMapping("/devices")
     public ResponseEntity<?> getDevices(@RequestParam Long barId) {
         try {

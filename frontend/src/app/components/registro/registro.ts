@@ -27,10 +27,8 @@ export class Registro implements AfterViewInit {
     password: '',
     confirmPassword: '',
     
-    // --- NUEVO: Credenciales ---
     clientId: '',
     clientSecret: '',
-    // ---------------------------
     
     latitud: 0,
     longitud: 0,

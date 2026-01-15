@@ -29,7 +29,7 @@ public class SpotifyService {
 
     private final RestTemplate restTemplate = new RestTemplate();
 
-    // Generador de cadenas aleatorias para el parámetro 'state' (Requisito 3.1.1)
+    // Generador de cadenas aleatorias para el parámetro 'state'
     private String generarStateAleatorio() {
         String caracteres = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         SecureRandom random = new SecureRandom();
@@ -50,7 +50,7 @@ public class SpotifyService {
 
         String scope = "streaming user-read-private user-read-email user-modify-playback-state user-read-playback-state playlist-read-private";
         
-        // REQUISITO 3.1.1: State aleatorio concatenado con barId
+        // State aleatorio concatenado con barId
         String stateAleatorio = barId + "_" + generarStateAleatorio();
 
         // CAMBIO: Usamos fromUriString que es más compatible y evitamos el error de compilación

@@ -1,28 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * La entidad 'Pagos' actúa como el libro de contabilidad (Ledger) de la aplicación.
- * Registra cada transacción económica que ocurre en el sistema de forma inmutable.
- *
- * * PUNTOS CLAVE:
- * 1. AUDITORÍA FINANCIERA:
- * Cada vez que alguien paga (ya sea un Bar pagando su suscripción o un Cliente
- * pagando una canción), se genera un registro aquí. Esto permite sacar reportes de
- * ingresos y facturación.
- *
- * 2. TRAZABILIDAD:
- * - 'barId': Sabemos quién ingresó el dinero (el local).
- * - 'cancionId': Si el pago fue por una canción, guardamos su ID para saber
- * exactamente qué canción generó ese ingreso (opcional, puede ser null si es suscripción).
- *
- * 3. CONSISTENCIA:
- * Al igual que en la configuración, usamos BigDecimal para evitar errores de céntimos
- * y LocalDateTime para saber el momento exacto de la transacción.
- * ======================================================================================
- */
-
 package com.gramola.backend.model;
 
 import jakarta.persistence.*;

@@ -1,27 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * Es el componente final del flujo de recuperación de contraseña ('ResetPasswordComponent').
- * Se carga cuando el usuario hace clic en el enlace de su correo (ej: /reset-password?token=XYZ).
- *
- * * PUNTOS CLAVE:
- * 1. EXTRACCIÓN DE TOKEN (ActivatedRoute):
- * Nada más cargar (ngOnInit), capturamos el parámetro 'token' de la URL.
- * Este token es la "llave" que valida que el usuario viene de un correo legítimo y no
- * está intentando hackear la cuenta de otro.
- *
- * 2. SEGURIDAD EN EL ENVÍO:
- * Al pulsar "Actualizar", enviamos al Backend el token (quién soy) y la nueva contraseña.
- * El servidor verificará si el token es válido y no ha caducado antes de permitir el cambio.
- *
- * 3. RETROALIMENTACIÓN (Feedback):
- * - Éxito: Mostramos una alerta y redirigimos al Login para que el usuario entre con su nueva clave.
- * - Error: Informamos si el token es inválido o ha expirado, guiando al usuario.
- * ======================================================================================
- */
-
 import { Component, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpClient } from '@angular/common/http';

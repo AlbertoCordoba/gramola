@@ -91,7 +91,7 @@ export class PasarelaPagoComponent implements OnInit, OnDestroy {
 
     this.card = this.elements.create('card', { 
       style: style,
-      hidePostalCode: true // Requisito 2.4 del doc
+      hidePostalCode: true
     });
     this.card.mount('#card-element');
     

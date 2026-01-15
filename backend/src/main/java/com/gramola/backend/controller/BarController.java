@@ -1,28 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * 'BarController' es el controlador REST encargado de la gestión de usuarios.
- * Expone los endpoints (URLs) para que la web pueda registrar bares, iniciar sesión
- * y gestionar pagos.
- *
- * * PUNTOS CLAVE:
- * 1. SEGURIDAD Y ACCESO:
- * Gestiona los endpoints públicos '/login' y '/registro'. Es la primera barrera
- * de entrada. Si las credenciales o el GPS fallan, devuelve un error 401/400 aquí.
- *
- * 2. FLUJO DE VERIFICACIÓN (RedirectView):
- * El método 'verificarEmail' es especial. No devuelve JSON, sino que REDIRIGE
- * al usuario. Cuando el dueño hace clic en el enlace de su correo, este método
- * valida el token y lo envía automáticamente a la web de "Pago Realizado".
- *
- * 3. FLEXIBILIDAD EN PAGOS:
- * El endpoint '/suscripcion' permite activar la cuenta. Acepta parámetros opcionales
- * (como 'simularError') para facilitar las pruebas del tribunal sin usar tarjetas reales.
- * ======================================================================================
- */
-
 package com.gramola.backend.controller;
 
 import com.gramola.backend.dto.BarLoginDTO;

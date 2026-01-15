@@ -7,7 +7,6 @@ import java.util.Base64;
 public class SimetricCipher {
 
     // IMPORTANTE: Esta clave debe tener 16 caracteres exactos para AES-128.
-    // En producción, esto iría en application.properties.
     private static final String SECRET_KEY = "BarGramolaSuperS"; 
 
     public static String encrypt(String strToEncrypt) {

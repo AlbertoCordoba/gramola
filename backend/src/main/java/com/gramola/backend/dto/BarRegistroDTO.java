@@ -13,10 +13,9 @@ public class BarRegistroDTO {
     private String password;
     private String confirmPassword;
     
-    // --- NUEVO: Credenciales de Spotify ---
+    //Credenciales de Spotify
     private String clientId;
     private String clientSecret;
-    // -------------------------------------
     
     // Ubicación
     private Double latitud;

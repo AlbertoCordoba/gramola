@@ -1,27 +1,3 @@
-/*
- * ======================================================================================
- * RESUMEN
- * ======================================================================================
- * * ¿QUÉ ES ESTA CLASE?
- * Gestiona la interacción principal de los clientes: pedir música y ver qué está sonando.
- *
- * * PUNTOS CLAVE:
- * 1. OPERACIÓN ATÓMICA (Pago + Pedido):
- * El endpoint '/cola/add' recibe en una sola llamada los datos de la canción Y la
- * confirmación del pago. Esto simplifica el frontend y evita inconsistencias.
- *
- * 2. FLEXIBILIDAD (Map vs DTO):
- * Para el método 'anadir', uso un 'Map<String, Object>' en lugar de una clase rígida.
- * Esto me permite recibir datos heterogéneos (info de canción + flags de pago)
- * de forma dinámica y procesarlos en el servicio.
- *
- * 3. CONTROL DE ESTADO:
- * El endpoint '/cola/estado' permite que el reproductor (Frontend) notifique al
- * servidor cuando una canción termina, para mantener la base de datos sincronizada
- * con la realidad musical.
- * ======================================================================================
- */
-
 package com.gramola.backend.controller;
 
 import com.gramola.backend.service.GramolaService;

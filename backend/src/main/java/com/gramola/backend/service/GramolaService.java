@@ -71,9 +71,8 @@ public class GramolaService {
         cancion.setBarId(barId);
         cancion.setSpotifyId((String) datos.get("spotifyId"));
         
-        // --- CAMBIO CLAVE: Usamos "titulo" para coincidir con el Frontend ---
+        // --- CAMBIO CLAVE: Usamos "titulo" para coincidir con el Frontend
         cancion.setTitulo((String) datos.get("titulo")); 
-        // -------------------------------------------------------------------
         
         cancion.setArtista((String) datos.get("artista"));
         

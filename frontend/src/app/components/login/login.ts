@@ -57,7 +57,7 @@ export class LoginComponent {
     this.barService.login(this.loginData).subscribe({
       next: (res: any) => {
         localStorage.setItem('usuarioBar', JSON.stringify(res));
-        // Redirige a donde corresponda en tu flujo
+        // Redirige a donde corresponda en el flujo
         this.router.navigate(['/gramola']); 
       },
       error: (err: any) => {

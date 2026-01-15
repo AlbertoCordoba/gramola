@@ -189,7 +189,6 @@ public class GramolaFunctionalTest {
         System.out.println("   -> Escribiendo Fecha (1230)...");
         escribirEnElementoActivo("1230");
 
-        // Espera salto automático
         try { Thread.sleep(800); } catch (Exception e) {}
 
         // CVC
