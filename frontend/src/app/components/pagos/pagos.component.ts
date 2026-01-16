@@ -31,6 +31,8 @@ export class PagosComponent implements OnInit {
     this.route.queryParams.subscribe(params => {
       if (params['verificado']) {
         console.log("Usuario verificado correctamente.");
+  // Este flujo no debe reutilizar una sesión previa (si existía).
+  localStorage.removeItem('usuarioBar');
         // Aquí podríamos mostrar un toast/notificación de "Email verificado"
       }
     });

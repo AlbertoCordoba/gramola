@@ -9,14 +9,16 @@ export const authPublicGuard: CanActivateFn = (route, state) => {
   // Comprobamos si hay un usuario guardado en el almacenamiento local del navegador.
   const usuario = localStorage.getItem('usuarioBar');
 
+  // Esta guardia solo se usa para proteger rutas públicas.
+  // Si hay una sesión antigua en localStorage y el usuario entra desde un enlace
+  // de verificación/pago, NO debemos forzar redirecciones inesperadas.
   if (usuario) {
-    // CASO A: USUARIO LOGUEADO
-    // Si ya existe sesión, NO tiene sentido que vea el Login o Registro.
-    // Lo redirigimos a la página principal de configuración.
-    router.navigate(['/config-audio']);
-    
-    // Devolvemos FALSE para cancelar la navegación a la ruta original (/login).
-    return false; 
+    const url = state.url || '';
+    const isAuthPage = url.startsWith('/login') || url.startsWith('/registro') || url.startsWith('/recuperar-password');
+    if (isAuthPage) {
+      router.navigate(['/config-audio']);
+      return false;
+    }
   }
 
   // CASO B: USUARIO ANÓNIMO
