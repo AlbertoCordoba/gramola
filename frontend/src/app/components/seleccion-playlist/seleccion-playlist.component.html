@@ -30,15 +30,16 @@
         <p class="description-text">Elige la playlist base para tu bar.</p>
 
         <div class="search-box">
-          <span class="search-icon" *ngIf="!cargando">🔍</span>
           <div class="mini-spinner" *ngIf="cargando"></div>
+          <span class="search-icon" *ngIf="!cargando">🔍</span>
 
           <input type="text" 
                  [(ngModel)]="busqueda" 
-                 (keyup)="onSearch()" 
+                 (ngModelChange)="onTyping()" 
+                 (keyup.enter)="forceSearch()" 
                  placeholder="Ej: Rock FM, Top 50 España...">
           
-          <button (click)="onSearch()" class="btn-search">Buscar</button>
+          <button (click)="forceSearch()" class="btn-search">Buscar</button>
         </div>
 
         <div class="results-list" *ngIf="resultados.length > 0">

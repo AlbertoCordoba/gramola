@@ -77,7 +77,7 @@ public class GramolaFunctionalTest {
         WebElement emailInput = wait.until(ExpectedConditions.visibilityOfElementLocated(By.name("email")));
         emailInput.clear();
         emailInput.sendKeys("aa@gail.com"); 
-        driver.findElement(By.name("password")).sendKeys("11");
+        driver.findElement(By.name("password")).sendKeys("12");
         driver.findElement(By.className("btn-login")).click();
 
         wait.until(ExpectedConditions.urlContains("config-audio"));

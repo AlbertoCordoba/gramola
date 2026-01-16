@@ -1,15 +1,15 @@
-import { Component, inject, OnInit, NgZone } from '@angular/core';
+import { Component, inject, OnInit, NgZone, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms'; // Necesario para [(ngModel)]
+import { FormsModule } from '@angular/forms'; 
 import { Router, ActivatedRoute } from '@angular/router';
 import { SpotifyConnectService } from '../../services/spotify.service';
-import { debounceTime, distinctUntilChanged, switchMap, catchError, filter } from 'rxjs/operators';
-import { Subject, of } from 'rxjs';
+import { debounceTime, distinctUntilChanged, switchMap, catchError, filter, finalize, tap } from 'rxjs/operators';
+import { Subject, of, merge } from 'rxjs'; 
 
 @Component({
   selector: 'app-seleccion-playlist',
   standalone: true,
-  imports: [CommonModule, FormsModule], // Importamos FormsModule
+  imports: [CommonModule, FormsModule],
   templateUrl: './seleccion-playlist.component.html',
   styleUrls: ['./seleccion-playlist.component.css']
 })
@@ -18,18 +18,20 @@ export class SeleccionPlaylistComponent implements OnInit {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   private ngZone = inject(NgZone);
+  private cdr = inject(ChangeDetectorRef); // INYECCIÓN PARA FORZAR ACTUALIZACIÓN
   
   usuario: any = null;
   statusMessage: string = '';
   playlistSeleccionada: any = null;
   
-  // VARIABLES QUE USA EL HTML
-  busqueda: string = '';           // Coincide con [(ngModel)]="busqueda"
+  // VARIABLES HTML
+  busqueda: string = '';
   resultados: any[] = [];
   cargando: boolean = false;
-  necesitaConexion: boolean = false; // Coincide con *ngIf="necesitaConexion"
+  necesitaConexion: boolean = false;
 
   private searchSubject = new Subject<string>();
+  private immediateSearchSubject = new Subject<string>();
 
   ngOnInit() {
     // 1. Cargar Usuario
@@ -55,43 +57,65 @@ export class SeleccionPlaylistComponent implements OnInit {
       }
     });
 
-    // 3. Configurar Buscador
-    this.searchSubject.pipe(
-      filter(term => term.trim().length > 0),
-      debounceTime(500),
-      distinctUntilChanged(),
+    // 3. BUSCADOR CON REFRESCO FORZADO
+    const typing$ = this.searchSubject.pipe(
+      filter(term => !!term && term.trim().length > 0),
+      debounceTime(500)
+    );
+
+    const immediate$ = this.immediateSearchSubject.pipe(
+      filter(term => !!term && term.trim().length > 0)
+    );
+
+    merge(typing$, immediate$).pipe(
+      distinctUntilChanged(), // Evita buscar lo mismo dos veces seguidas
+      tap(() => {
+        this.ngZone.run(() => { 
+          this.cargando = true; 
+          this.playlistSeleccionada = null;
+          this.cdr.detectChanges(); // FORZAR VISTA: MOSTRAR SPINNER
+        });
+      }),
       switchMap((term) => {
-        this.ngZone.run(() => { this.cargando = true; });
         return this.spotifyService.search(term, this.usuario.id, 'playlist').pipe(
            catchError((err) => {
-             // Si falla la autenticación (401), mostramos botón de conectar
              if (err.status === 400 || err.status === 401 || err.status === 500) {
                 this.necesitaConexion = true;
                 this.statusMessage = "⚠️ Tu sesión de Spotify ha caducado.";
              }
-             return of([]);
-           }) 
+             return of([]); 
+           }),
+           finalize(() => {
+             this.ngZone.run(() => { 
+                this.cargando = false; 
+                this.cdr.detectChanges(); // FORZAR VISTA: OCULTAR SPINNER (Incluso si se cancela)
+             });
+           })
         );
       })
     ).subscribe({
       next: (res: any) => {
         this.ngZone.run(() => {
-          this.cargando = false;
           if (res && res.playlists && res.playlists.items) {
-             // Filtramos playlists rotas o vacías
              this.resultados = res.playlists.items
                 .filter((p: any) => p && p.id && p.name && p.tracks && p.tracks.total > 0)
                 .map((item: any) => ({ ...item, imgLoaded: false }));
           } else {
              this.resultados = [];
           }
+          this.cdr.detectChanges(); // FORZAR VISTA: MOSTRAR RESULTADOS
         });
       },
-      error: () => this.ngZone.run(() => { this.cargando = false; })
+      error: (e) => {
+        console.error(e);
+        this.ngZone.run(() => {
+            this.cargando = false;
+            this.cdr.detectChanges(); // FORZAR VISTA EN ERROR
+        });
+      }
     });
   }
 
-  // Verifica si tenemos token válido sin hacer ruido
   checkConexion() {
     this.spotifyService.getToken(this.usuario.id).subscribe({
       next: () => this.necesitaConexion = false,
@@ -99,22 +123,26 @@ export class SeleccionPlaylistComponent implements OnInit {
     });
   }
 
-  // Método llamado por el HTML (keyup)
-  onSearch() {
-    if (this.busqueda.trim().length > 0) {
+  onTyping() {
+    if (this.busqueda && this.busqueda.trim().length > 0) {
       this.searchSubject.next(this.busqueda);
     }
   }
 
-  // Método llamado por el botón de conectar
+  forceSearch() {
+    // Timeout para asegurar que el valor del input ha llegado a la variable 'busqueda'
+    setTimeout(() => {
+        if (this.busqueda && this.busqueda.trim().length > 0) {
+            this.immediateSearchSubject.next(this.busqueda);
+        }
+    }, 10);
+  }
+
   conectarSpotify() {
     this.spotifyService.getAuthUrl(this.usuario.id).subscribe({
       next: (res: any) => {
-        if (res && res.url) {
-            window.location.href = res.url; 
-        } else {
-            alert("Error: URL de conexión inválida.");
-        }
+        if (res && res.url) window.location.href = res.url; 
+        else alert("Error: URL de conexión inválida.");
       },
       error: () => alert("Error al conectar con el servidor.")
     });
@@ -128,7 +156,6 @@ export class SeleccionPlaylistComponent implements OnInit {
       uri: playlist.uri,
       image: playlist.images?.[0]?.url
     }));
-    // Limpiamos memoria para evitar conflictos
     localStorage.removeItem('ambientResumeUri'); 
     localStorage.removeItem('lastTrackUri');
     localStorage.removeItem('pedidoPendiente');
