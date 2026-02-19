@@ -94,7 +94,7 @@ export class Gramola implements OnInit, OnDestroy {
   currentDevice: any;
   deviceError? : string;
   private deviceSubscription?: Subscription;
-
+  // CONSTRUCTOR: Recupera la sesión del bar y añade un listener para guardar el estado crítico (modo y canción) en el LocalStorage si el usuario intenta cerrar o recargar la pestaña.
   constructor() {
     const userJson = localStorage.getItem('usuarioBar');
     if (userJson) {
@@ -117,6 +117,7 @@ export class Gramola implements OnInit, OnDestroy {
     });
   }
 
+  // MÉTODO DE INICIO: Recupera la sesión, la playlist de fondo y arranca el SDK de Spotify.
   ngOnInit() {
     const plGuardada = localStorage.getItem('playlistFondo');
     if (plGuardada) {
@@ -164,7 +165,7 @@ export class Gramola implements OnInit, OnDestroy {
     }
   }
 
-  // --- POLLING AUTOMÁTICO DE DISPOSITIVOS ---
+  // startAutoRefreshDevices: Hilo reactivo que consulta cada 5s los dispositivos disponibles en la cuenta de Spotify del bar para mantener la lista de salida de audio actualizada.
   startAutoRefreshDevices() {
     this.deviceSubscription = interval(5000)
       .pipe(
@@ -185,7 +186,7 @@ export class Gramola implements OnInit, OnDestroy {
         }
       });
   }
-
+  // setupLiveSearch: Configura el buscador reactivo de Spotify con 'debounceTime' para no saturar la API mientras el usuario escribe su búsqueda.
   setupLiveSearch() {
     this.searchControl.valueChanges.pipe(
       filter(text => (text || '').trim().length > 0),
@@ -224,7 +225,7 @@ export class Gramola implements OnInit, OnDestroy {
       }
     });
   }
-
+  // cargarTracksDeRespaldo: Descarga la lista completa de canciones de la playlist de ambiente para tenerlas listas como "relleno" visual en la interfaz.
   cargarTracksDeRespaldo() {
     if (!this.playlistFondo?.id) return;
     this.spotifyService.getPlaylist(this.playlistFondo.id, this.usuario.id).subscribe({
@@ -239,11 +240,11 @@ export class Gramola implements OnInit, OnDestroy {
       error: (e: any) => console.error("Error cargando respaldo:", e)
     });
   }
-
+  // getTrackKey: Genera una clave única normalizada (título|artista) para identificar canciones y evitar duplicados visuales en la cola.
   private getTrackKey(titulo: string, artista: string): string {
     return `${titulo?.toLowerCase().trim().replace(/[^a-z0-9]/g, '')}|${artista?.toLowerCase().trim().replace(/[^a-z0-9]/g, '')}`;
   }
-
+  // encontrarIndiceSeguro: Localiza una canción en la lista de respaldo comparando IDs, URIs o metadatos para asegurar la continuidad de la música de ambiente.
   private encontrarIndiceSeguro(trackId: string, trackUri: string, trackName: string, trackArtist: string): number {
     if (!this.tracksRespaldo || this.tracksRespaldo.length === 0) return -1;
     let idx = this.tracksRespaldo.findIndex(t => t.id === trackId);
@@ -258,7 +259,7 @@ export class Gramola implements OnInit, OnDestroy {
     );
     return idx;
   }
-
+  // actualizarColaVisual: Algoritmo de mezcla. Construye la lista que ve el bar combinando los pedidos pagados con las próximas pistas de la lista de ambiente.
   actualizarColaVisual() {
     const listaFinal: ItemCola[] = [];
     const MINIMO_CANCIONES = 5;
@@ -352,7 +353,7 @@ export class Gramola implements OnInit, OnDestroy {
     this.colaVisual = listaFinal;
     this.cdr.detectChanges();
   }
-
+  // cargarPrecioCancion: Consulta en el servidor el coste actual de pedir una canción para configurar correctamente la pasarela de pago.
   cargarPrecioCancion() {
     this.http.get<any>('http://localhost:8080/api/bares/precios').subscribe({
       next: (precios: any) => {
@@ -364,7 +365,7 @@ export class Gramola implements OnInit, OnDestroy {
       error: (e: any) => console.error('Error cargando precio', e)
     });
   }
-
+  // getDevices: Realiza una petición manual para listar los dispositivos disponibles (móvil, PC, etc.) y detecta cuál es el dispositivo activo actualmente.
   getDevices() {
     this.deviceError = undefined;
     this.isSearching = true;
@@ -382,7 +383,7 @@ export class Gramola implements OnInit, OnDestroy {
       }
     });
   }
-
+// initSpotifySDK: Inyecta el script oficial de Spotify en el HTML si no existe y espera a que esté listo para conectar.
   initSpotifySDK() {
     if (window.Spotify) {
       this.requestTokenAndConnect();
@@ -397,7 +398,7 @@ export class Gramola implements OnInit, OnDestroy {
       document.body.appendChild(script);
     }
   }
-
+  // requestTokenAndConnect: Solicita un token de acceso fresco al backend y, al recibirlo, procede a inicializar el reproductor con las credenciales del bar.
   requestTokenAndConnect() {
     this.spotifyService.getToken(this.usuario.id).subscribe({
       next: (res: any) => {
@@ -405,7 +406,7 @@ export class Gramola implements OnInit, OnDestroy {
       }
     });
   }
-
+  // initializePlayer: Configura el 'Gramola Virtual Player', define su volumen y registra los listeners de eventos para reaccionar a cambios de estado o errores de conexión.
   initializePlayer(token: string) {
     this.player = new window.Spotify.Player({
       name: 'Gramola Virtual Player',
@@ -430,7 +431,7 @@ export class Gramola implements OnInit, OnDestroy {
 
     this.player.connect();
   }
-
+  // restaurarEstado: Al iniciar, verifica si había un 'PEDIDO' sonando antes de cerrar la sesión para intentar reanudarlo inmediatamente sin perder la posición.
   restaurarEstado() {
     const lastModo = localStorage.getItem('lastModo');
     const pedidoJson = localStorage.getItem('pedidoPendiente');
@@ -464,7 +465,7 @@ export class Gramola implements OnInit, OnDestroy {
         this.reproducirAmbiente(true); 
     }
   }
-
+  // verificarAutoplay: Comprueba si la política del navegador ha bloqueado el sonido automático y, si es así, activa el aviso visual para el usuario.
   verificarAutoplay() {
     setTimeout(() => {
         this.player.getCurrentState().then((state: any) => {
@@ -481,7 +482,7 @@ export class Gramola implements OnInit, OnDestroy {
         });
     }, 2000);
   }
-
+  // gestionarCambioDeEstado: El núcleo lógico. Detecta el fin de una canción, gestiona el historial visual y decide si debe saltar al siguiente pedido pagado o seguir con el ambiente.
   gestionarCambioDeEstado(state: any) {
     if (!state) return;
     const isFinished = state.paused && state.position === 0 && state.track_window.next_tracks.length === 0;
@@ -551,14 +552,14 @@ export class Gramola implements OnInit, OnDestroy {
     this.actualizarColaVisual();
     this.cdr.detectChanges();
   }
-
+  // agregarAlHistorialVisual: Añade dinámicamente la última canción reproducida a la lista de "Recién sonadas" para dar feedback al local.
   agregarAlHistorialVisual(track: any, tipo: 'PEDIDO' | 'AMBIENTE') {
     if (!track) return;
     if (this.historialVisual.length > 0 && this.historialVisual[0].titulo === track.name) return; 
     this.historialVisual.unshift({ titulo: track.name, artista: track.artists[0].name, tipo: tipo });
     if (this.historialVisual.length > 5) this.historialVisual.pop();
   }
-
+  // reproducirAmbiente: Envía la orden de reproducir la playlist de fondo del local, intentando retomar la música desde la última posición guardada ('offset').
   reproducirAmbiente(chequearAutoplay: boolean = false) {
     if (!this.deviceId || !this.playlistFondo) return;
     this.changingTrack = true;
@@ -589,7 +590,7 @@ export class Gramola implements OnInit, OnDestroy {
       }
     });
   }
-
+  // activarSonidoManual: Método de auxilio para el usuario; permite arrancar la reproducción manualmente si el autoplay fue bloqueado por el navegador.
   activarSonidoManual() {
     this.necesitaInteraccion = false;
     if (this.modoReproduccion === 'PEDIDO' && this.cancionSonando) {
@@ -598,7 +599,7 @@ export class Gramola implements OnInit, OnDestroy {
         this.reproducirAmbiente(false);
     }
   }
-
+  // resetVariables: Reinicia los flags de control interno tras un cambio de canción para preparar el sistema para el siguiente evento.
   private resetVariables() {
     setTimeout(() => {
         this.changingTrack = false;
@@ -607,7 +608,7 @@ export class Gramola implements OnInit, OnDestroy {
         this.cdr.detectChanges(); 
     }, 1500);
   }
-
+  // procesarSiguientePedido: Extrae la canción prioritaria de la cola de pagos, la pone a sonar y notifica al Backend que ha pasado al estado 'SONANDO'.
   procesarSiguientePedido() {
     if (this.colaReproduccion.length === 0) return;
     this.changingTrack = true;
@@ -634,7 +635,7 @@ export class Gramola implements OnInit, OnDestroy {
       }
     });
   }
-
+  // finalizarPedidoActual: Avisa al servidor que la canción pagada ha terminado correctamente para moverla al historial de la base de datos.
   finalizarPedidoActual() {
     if (this.cancionSonando?.id) {
       this.gramolaService.actualizarEstado(Number(this.cancionSonando.id), 'TERMINADA').subscribe({
@@ -649,7 +650,7 @@ export class Gramola implements OnInit, OnDestroy {
         localStorage.removeItem('pedidoPendiente');
     }
   }
-
+  // cargarCola: Petición recurrente al Backend para obtener los pedidos de clientes pagados y actualizar la lista de reproducción local.
   cargarCola() {
     this.gramolaService.obtenerCola(Number(this.usuario.id)).subscribe({
       next: (res: any) => {
@@ -665,7 +666,7 @@ export class Gramola implements OnInit, OnDestroy {
       }
     });
   }
-
+  // formatTime: Utilidad para convertir milisegundos en un formato de tiempo legible (minutos:segundos) para el reproductor.
   formatTime(ms: number): string {
     if (!ms) return "0:00";
     const totalSeconds = Math.floor(ms / 1000);
@@ -673,12 +674,12 @@ export class Gramola implements OnInit, OnDestroy {
     const seconds = totalSeconds % 60;
     return `${minutes}:${seconds.toString().padStart(2, '0')}`;
   }
-
+  // search: Disparador manual para refrescar el valor del control de búsqueda en la interfaz de usuario.
   search() {
     const val = this.searchControl.value;
     if (val && val.trim().length > 0) this.searchControl.setValue(val);
   }
-
+  // anadir: Prepara el objeto de pago con los metadatos de la canción seleccionada y abre el modal de la pasarela de Stripe.
   anadir(track: any) {
     if (this.precioCancion <= 0) {
         alert("El sistema de precios no está disponible.");
@@ -701,7 +702,7 @@ export class Gramola implements OnInit, OnDestroy {
     });
     this.showPaymentModal = true;
   }
-
+  // onPaymentClosed: Gestiona el cierre del modal de pago. Si la transacción fue exitosa, limpia la búsqueda y refresca la cola inmediatamente.
   onPaymentClosed(success: boolean) {
     this.showPaymentModal = false;
     if (success) {
@@ -710,13 +711,13 @@ export class Gramola implements OnInit, OnDestroy {
       this.cargarCola();
     }
   }
-
+  // restaurarEstado: Al iniciar, verifica si había un 'PEDIDO' sonando antes de cerrar la sesión para intentar reanudarlo inmediatamente sin perder la posición.
   logout() {
     localStorage.clear();
     this.player?.disconnect();
     this.router.navigate(['/login']);
   }
-
+  // ngOnDestroy: Limpia la memoria. Desconecta al reproductor y detiene todos los cronómetros y suscripciones para evitar fugas de recursos.
   ngOnDestroy() {
     if (this.player) this.player.disconnect();
     if (this.pollingInterval) clearInterval(this.pollingInterval);
@@ -724,7 +725,7 @@ export class Gramola implements OnInit, OnDestroy {
     if (this.deviceSubscription) this.deviceSubscription.unsubscribe();
     this.titleService.setTitle('Gramola'); 
   }
-
+  // getDevices: Realiza una petición manual para listar los dispositivos disponibles (móvil, PC, etc.) y detecta cuál es el dispositivo activo actualmente.
   selectDevice(device: any) {
       this.deviceId = device.id;
       this.currentDevice = device;

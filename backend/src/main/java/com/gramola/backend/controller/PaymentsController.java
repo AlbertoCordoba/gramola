@@ -14,7 +14,8 @@ public class PaymentsController {
 
     @Autowired
     private PaymentService service;
-
+    // MÉTODO: Genera una intención de pago (pre-pago) antes de conectar con la pasarela.
+    // Recibe el email del bar y el tipo de plan para calcular el importe correcto en el servicio.
     @GetMapping("/prepay")
     public StripeTransaction prepay(
             @RequestParam String email, 

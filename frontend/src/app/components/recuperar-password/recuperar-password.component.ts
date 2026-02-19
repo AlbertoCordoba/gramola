@@ -25,7 +25,8 @@ export class RecuperarPasswordComponent {
   errorMsg: string = '';     // Mensaje de error si falla (ej: "Email no existe")
   cargando: boolean = false; // Estado de espera (spinner en botón)
 
-  // --- LÓGICA DE NEGOCIO ---
+  // MÉTODO: Envía el email al Backend. Si el correo existe en la BD, Java disparará 
+  // un token único y un enlace de recuperación al buzón del dueño.
   enviar() {
     // 1. Validación básica: No enviamos nada si el campo está vacío
     if (!this.email) return;

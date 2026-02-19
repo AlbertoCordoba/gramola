@@ -15,7 +15,7 @@ public class GramolaController {
     @Autowired
     private GramolaService gramolaService;
 
-    // --- AÑADIR CANCIÓN ---
+    // MÉTODO: Recibe los datos de una canción pagada y coordina con el servicio su inserción en la cola.
     @PostMapping("/cola/add")
     public ResponseEntity<?> anadir(@RequestBody Map<String, Object> datos) {
         try {
@@ -27,19 +27,19 @@ public class GramolaController {
         }
     }
 
-    // --- LEER COLA (Próximas) ---
+    // MÉTODO: Devuelve la lista de canciones que están en estado 'ESPERANDO' para un bar específico.
     @GetMapping("/cola/{barId}")
     public ResponseEntity<?> verCola(@PathVariable Long barId) {
         return ResponseEntity.ok(gramolaService.obtenerCola(barId));
     }
 
-    // --- LEER HISTORIAL (Pasadas) ---
+   // MÉTODO: Recupera el listado de canciones que ya han sido reproducidas ('TERMINADA') en ese local.
     @GetMapping("/historial/{barId}")
     public ResponseEntity<?> verHistorial(@PathVariable Long barId) {
         return ResponseEntity.ok(gramolaService.obtenerHistorial(barId));
     }
 
-    // --- ACTUALIZAR ESTADO (Callback del Reproductor) ---
+    // MÉTODO: Callback vital. El reproductor del Front avisa aquí cuando una canción cambia a 'SONANDO' o 'TERMINADA'.
     @PostMapping("/cola/estado")
     public ResponseEntity<?> cambiarEstado(@RequestBody Map<String, Object> payload) {
         try {

@@ -24,7 +24,8 @@ export class PagosComponent implements OnInit {
   emailUsuario: string = '';
   cargando: boolean = true; // Controla el spinner de carga inicial
   errorMensaje: string = '';
-
+  // MÉTODO DE INICIO: Verifica si el usuario viene de confirmar su email 
+  // y descarga los precios actualizados desde la base de datos del Backend.
   ngOnInit() {
     // 1. Detección de retorno de verificación
     // Si la URL es /pagos?verificado=true, sabemos que acaba de confirmar su email
@@ -40,7 +41,8 @@ export class PagosComponent implements OnInit {
     // 2. Carga de datos
     this.cargarPrecios();
   }
-
+  // MÉTODO: Obtiene los importes del servidor y los "normaliza" (limpia espacios y mayúsculas) 
+  // para asegurar que los botones de la interfaz funcionen con los datos correctos.
   cargarPrecios() {
     // Llamada GET al backend para obtener la configuración de precios actualizada
     this.http.get('http://localhost:8080/api/bares/precios').subscribe({
@@ -72,7 +74,8 @@ export class PagosComponent implements OnInit {
     });
   }
 
-  // Método invocado al hacer clic en "Elegir Plan"
+  // MÉTODO DE TRANSICIÓN: Guarda el email y el plan elegido en un 'State Service' (en memoria) 
+  // y redirige a la pasarela de Stripe para procesar la tarjeta.
   pagar(tipo: string) {
     // Validación simple del campo email
     if (!this.emailUsuario) {

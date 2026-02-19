@@ -18,9 +18,10 @@ export class CallbackComponent implements OnInit {
   private router = inject(Router);
   private spotifyService = inject(SpotifyConnectService);
 
-  // Variable para evitar doble llamada
+  // VARIABLE: Evita que Angular realice dos peticiones simultáneas al Backend (doble disparo).
   private procesando = false;
-
+  // MÉTODO: Captura los parámetros 'code' y 'state' de la URL enviados por Spotify.
+  // Si son válidos, los envía al Backend para obtener los tokens definitivos.
   ngOnInit() {
     this.route.queryParams.subscribe(params => {
       const code = params['code'];
@@ -45,4 +46,6 @@ export class CallbackComponent implements OnInit {
       }
     });
   }
+  // MÉTODO: Redirige al bar a la configuración de audio tras el éxito o error de la vinculación.
+  // Pasa un parámetro 'status' para que la otra pantalla sepa qué mensaje mostrar.
 }

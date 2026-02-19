@@ -38,7 +38,7 @@ public class BarService {
     private PagosRepository pagosRepository;
     
     private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
-
+    // MÉTODO: Consulta la base de datos para obtener los precios configurados (canciones y suscripciones).
     public Map<String, BigDecimal> obtenerPrecios() {
         Map<String, BigDecimal> precios = new HashMap<>();
         List<ConfiguracionPrecios> lista = preciosRepository.findAll();
@@ -48,7 +48,8 @@ public class BarService {
         }
         return precios;
     }
-
+    // MÉTODO: Gestiona el alta de nuevos locales. Valida contraseñas, cifra datos sensibles (AES), 
+    // hashea la clave del usuario (BCrypt) y dispara el correo de verificación.
     public void registrarBar(BarRegistroDTO datos) throws Exception {
         // --- LÓGICA DE ESCENARIOS ALTERNATIVOS (Integrada) ---
         Optional<Bar> barExistente = barRepository.findByEmail(datos.getEmail());
@@ -103,13 +104,15 @@ public class BarService {
         emailService.sendWelcomeEmail(bar.getEmail(), token);
     }
 
+    // MÉTODO: Verifica el token único enviado por email para activar la cuenta del bar.
     public void confirmarCuenta(String token) throws Exception {
         Bar bar = barRepository.findByTokenConfirmacion(token)
                 .orElseThrow(() -> new Exception("Token inválido"));
         bar.setTokenConfirmacion(null);
         barRepository.save(bar);
     }
-
+    // MÉTODO: Proceso de entrada. Valida credenciales, estado de la cuenta (activa/pagada) 
+    // y comprueba la ubicación GPS mediante la fórmula de Haversine.
     public Bar login(BarLoginDTO datos) throws Exception {
         Bar bar = barRepository.findByEmail(datos.getEmail())
                 .orElseThrow(() -> new Exception("Usuario no encontrado"));
@@ -134,7 +137,8 @@ public class BarService {
 
         return bar;
     }
-
+    // MÉTODO: Algoritmo matemático que calcula la distancia real en metros entre las coordenadas 
+    // actuales del dueño y la ubicación registrada del local.
     private double calcularDistancia(double lat1, double lon1, double lat2, double lon2) {
         final int R = 6371; 
         double latDistance = Math.toRadians(lat2 - lat1);
@@ -145,7 +149,7 @@ public class BarService {
         double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return (R * c) * 1000; 
     }
-
+    // MÉTODO: Genera un token temporal y envía un correo para permitir al usuario cambiar su clave olvidada.
     public void solicitarRecuperacion(String email) throws Exception {
         Optional<Bar> barOpt = barRepository.findByEmail(email);
         if (barOpt.isPresent()) {
@@ -157,7 +161,7 @@ public class BarService {
             emailService.sendPasswordRecoveryEmail(bar.getEmail(), token);
         }
     }
-
+    // MÉTODO: Aplica la nueva contraseña tras verificar que el token de recuperación es válido y no ha expirado.
     public void restablecerPassword(String token, String newPassword) throws Exception {
         Bar bar = barRepository.findByResetPasswordToken(token)
                 .orElseThrow(() -> new Exception("Token inválido"));
@@ -168,7 +172,8 @@ public class BarService {
         bar.setResetPasswordExpires(null);
         barRepository.save(bar);
     }
-
+    // MÉTODO: Registra el pago en el historial, activa el acceso al sistema y 
+    // calcula la fecha de vencimiento según el plan elegido (mensual o anual).
     public void activarSuscripcion(String email, String tipo, boolean simularError) throws Exception {
         Bar bar = barRepository.findByEmail(email)
                 .orElseThrow(() -> new Exception("Usuario no encontrado"));

@@ -21,6 +21,8 @@ export class ResetPasswordComponent implements OnInit {
   token: string = '';    // El código de seguridad que viene en la URL
   password: string = ''; // La nueva contraseña que escribe el usuario
 
+  // MÉTODO DE INICIO: Captura automáticamente el token del enlace que el usuario pulsó en su email.
+  // Sin este parámetro (?token=...), el componente no podrá autorizar el cambio en el servidor.
   ngOnInit() {
     // 1. CAPTURA DEL TOKEN
     // Nos suscribimos a los 'queryParams' de la ruta activa.
@@ -30,7 +32,8 @@ export class ResetPasswordComponent implements OnInit {
       // Nota: Si no hay token, el Backend rechazará cualquier intento de cambio.
     });
   }
-
+  // MÉTODO PRINCIPAL: Envía la nueva contraseña y el token al Backend. 
+  // Si Java confirma que el token es válido y no ha expirado, actualiza la base de datos.
   cambiar() {
     // Validación básica en cliente
     if (!this.password) return;

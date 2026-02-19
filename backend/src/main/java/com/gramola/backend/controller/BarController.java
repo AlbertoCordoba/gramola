@@ -23,7 +23,7 @@ public class BarController {
     @Autowired
     private BarService barService;
 
-    // --- REGISTRO ---
+    // MÉTODO: Procesa el formulario de registro. Delega al servicio el hasheo de claves y envío de email.
     @PostMapping("/registro")
     public ResponseEntity<?> registrar(@RequestBody BarRegistroDTO barDTO) {
         try {
@@ -36,7 +36,7 @@ public class BarController {
         }
     }
 
-    // --- VERIFICACIÓN DE EMAIL (Redirección) ---
+    // MÉTODO: Punto de retorno del email. Valida el token y redirige al usuario a la pantalla de pagos.
     @GetMapping("/verificar")
     public RedirectView verificarEmail(@RequestParam String token) {
         try {
@@ -49,7 +49,7 @@ public class BarController {
         }
     }
 
-    // --- LOGIN (Con Geolocalización) ---
+    // MÉTODO: Autenticación del bar. El servicio verifica la contraseña y la distancia GPS (máximo 100m).
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody BarLoginDTO loginDTO) {
         try {
@@ -61,13 +61,13 @@ public class BarController {
             return ResponseEntity.status(401).body(Collections.singletonMap("error", e.getMessage()));
         }
     }
-
+    // MÉTODO: Cierra la sesión activa del usuario.
     @PostMapping("/logout")
     public ResponseEntity<?> logout() {
         return ResponseEntity.ok(Collections.singletonMap("mensaje", "Sesión cerrada"));
     }
 
-    // --- RECUPERACIÓN DE CONTRASEÑA ---
+   // MÉTODO: Genera un token de recuperación y envía un enlace al correo del dueño del bar.
     @PostMapping("/recuperar-password")
     public ResponseEntity<?> recuperarPassword(@RequestBody Map<String, String> payload) {
         try {
@@ -77,7 +77,7 @@ public class BarController {
             return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
         }
     }
-
+    // MÉTODO: Sobreescribe la contraseña antigua por la nueva tras validar el token de recuperación.
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> payload) {
         try {
@@ -88,12 +88,12 @@ public class BarController {
         }
     }
 
-    // --- PAGOS Y PRECIOS ---
+    // MÉTODO: Devuelve los importes actuales de canciones y suscripciones desde la base de datos.
     @GetMapping("/precios")
     public ResponseEntity<?> getPrecios() {
         return ResponseEntity.ok(barService.obtenerPrecios());
     }
-
+    // MÉTODO: Finaliza el proceso de alta. Activa el bar y calcula la fecha de fin según el plan elegido.
     @PostMapping("/suscripcion")
     public ResponseEntity<?> activarSuscripcion(@RequestBody Map<String, Object> payload) {
         try {

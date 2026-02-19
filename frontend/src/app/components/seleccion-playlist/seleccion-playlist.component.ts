@@ -33,6 +33,8 @@ export class SeleccionPlaylistComponent implements OnInit {
   private searchSubject = new Subject<string>();
   private immediateSearchSubject = new Subject<string>();
 
+  // MÉTODO DE INICIO: Carga el usuario, gestiona el retorno de la conexión con Spotify 
+  // y configura el motor de búsqueda "reactivo" con Debounce y SwitchMap.
   ngOnInit() {
     // 1. Cargar Usuario
     const userJson = localStorage.getItem('usuarioBar');
@@ -115,20 +117,21 @@ export class SeleccionPlaylistComponent implements OnInit {
       }
     });
   }
-
+  // MÉTODO TÉCNICO: Verifica si el bar ya tiene el token de Spotify activo antes de permitir la búsqueda.
   checkConexion() {
     this.spotifyService.getToken(this.usuario.id).subscribe({
       next: () => this.necesitaConexion = false,
       error: () => this.necesitaConexion = true
     });
   }
-
+  // MÉTODO: Dispara la búsqueda con un pequeño retraso (500ms) para no colapsar la API mientras el usuario escribe.
   onTyping() {
     if (this.busqueda && this.busqueda.trim().length > 0) {
       this.searchSubject.next(this.busqueda);
     }
   }
-
+  // MÉTODO: Fuerza una búsqueda inmediata ignorando el tiempo de espera (debounce).
+  // Útil para cuando el usuario pulsa un botón de "Buscar" o "Enter" y no quiere esperar 500ms.
   forceSearch() {
     // Timeout para asegurar que el valor del input ha llegado a la variable 'busqueda'
     setTimeout(() => {
@@ -137,7 +140,7 @@ export class SeleccionPlaylistComponent implements OnInit {
         }
     }, 10);
   }
-
+  // MÉTODO: Inicia el flujo OAuth2 redirigiendo al dueño del bar a la página oficial de Spotify.
   conectarSpotify() {
     this.spotifyService.getAuthUrl(this.usuario.id).subscribe({
       next: (res: any) => {
@@ -147,7 +150,7 @@ export class SeleccionPlaylistComponent implements OnInit {
       error: () => alert("Error al conectar con el servidor.")
     });
   }
-
+  // MÉTODO: Guarda la playlist elegida en 'localStorage' para que la Gramola sepa qué música poner de fondo.
   seleccionar(playlist: any) {
     this.playlistSeleccionada = playlist;
     localStorage.setItem('playlistFondo', JSON.stringify({
@@ -160,7 +163,8 @@ export class SeleccionPlaylistComponent implements OnInit {
     localStorage.removeItem('lastTrackUri');
     localStorage.removeItem('pedidoPendiente');
   }
-
+  // MÉTODO: Finaliza el proceso de configuración. Una vez elegida la música de fondo, 
+  // redirige al panel principal de la Gramola para empezar la jornada.
   confirmar() {
     if (this.playlistSeleccionada) {
       this.router.navigate(['/gramola']);

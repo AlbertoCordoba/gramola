@@ -39,6 +39,7 @@ export class Registro implements AfterViewInit {
   enviado: boolean = false; 
   cargando: boolean = false;
 
+  // MÉTODO DE INICIALIZACIÓN: Configura el pincel del Canvas y escucha eventos de ratón/táctiles.
   ngAfterViewInit() {
     if (!this.canvasRef) return;
     const canvas = this.canvasRef.nativeElement;
@@ -64,12 +65,13 @@ export class Registro implements AfterViewInit {
     });
     canvas.addEventListener('touchend', () => this.stopDrawing());
   }
-  
+  // MÉTODO: Se activa al pulsar el ratón o tocar la pantalla. 
+  // Marca 'isDrawing' como verdadero para permitir que el trazo comience.
   private startDrawing(e: any) {
     this.isDrawing = true;
     this.draw(e); 
   }
-
+  // MÉTODOS DE DIBUJO: Capturan el movimiento del trazo y lo pintan en el lienzo en tiempo real.
   private draw(e: any) {
     if (!this.isDrawing || !this.cx) return;
     const rect = this.canvasRef.nativeElement.getBoundingClientRect();
@@ -80,27 +82,28 @@ export class Registro implements AfterViewInit {
     this.cx.beginPath();
     this.cx.moveTo(x, y);
   }
-
+  // MÉTODO: Se activa al soltar el clic o levantar el dedo. 
+  // Detiene el proceso de dibujo y llama a 'guardarImagen' para actualizar el Base64.
   private stopDrawing() {
     if (!this.isDrawing) return;
     this.isDrawing = false;
     this.cx?.beginPath(); 
     this.guardarImagen(); 
   }
-
+  // MÉTODO: Convierte el dibujo del Canvas en un string Base64 para enviarlo como imagen al Backend.
   guardarImagen() {
     if (this.canvasRef && this.canvasRef.nativeElement) {
       this.registroData.firmaBase64 = this.canvasRef.nativeElement.toDataURL('image/png');
     }
   }
-
+  // MÉTODO: Limpia por completo el lienzo del Canvas y resetea el string de la imagen.
   limpiarFirma() {
     if (!this.cx || !this.canvasRef) return;
     const canvas = this.canvasRef.nativeElement;
     this.cx.clearRect(0, 0, canvas.width, canvas.height);
     this.registroData.firmaBase64 = ''; 
   }
-
+  // MÉTODO: Captura las coordenadas reales del local para la futura validación del login.
   obtenerUbicacion() {
     this.errorMessage = '';
     
@@ -117,7 +120,7 @@ export class Registro implements AfterViewInit {
       this.errorMessage = 'Tu navegador no soporta geolocalización.';
     }
   }
-
+  // MÉTODO PRINCIPAL: Valida los campos y envía el objeto completo al servidor para crear la cuenta.
   onRegistro() {
     this.errorMessage = '';
     

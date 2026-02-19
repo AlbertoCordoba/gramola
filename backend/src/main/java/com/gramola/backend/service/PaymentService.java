@@ -26,12 +26,13 @@ public class PaymentService {
 
     @Value("${stripe.key.secret}")
     private String secretKey;
-
+    // MÉTODO: Inicializa la configuración de Stripe usando la clave secreta definida en application.properties.
     @PostConstruct
     public void init() {
         Stripe.apiKey = secretKey;
     }
-
+    // MÉTODO: Crea una intención de pago (PaymentIntent). Calcula el precio desde la BD, 
+    // lo convierte a céntimos (exigencia de Stripe) y genera un 'client_secret' para el Frontend.
     public StripeTransaction prepay(String email, String tipoPago) throws StripeException {
         // 1. Obtención dinámica del precio
         String claveBD = tipoPago.equalsIgnoreCase("CANCION") ? "PRECIO_CANCION" : "SUSCRIPCION_MENSUAL";

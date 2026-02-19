@@ -28,7 +28,7 @@ public class SpotifyService {
     private BarRepository barRepository;
 
     private final RestTemplate restTemplate = new RestTemplate();
-
+    // MÉTODO: Crea una cadena aleatoria de seguridad para el parámetro 'state' de OAuth2.
     private String generarStateAleatorio() {
         String caracteres = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         SecureRandom random = new SecureRandom();
@@ -38,7 +38,8 @@ public class SpotifyService {
         }
         return sb.toString();
     }
-
+    // MÉTODO: Construye la URL de autorización de Spotify. Incluye el ID del bar en el 'state' 
+    // para saber quién vuelve en el callback y proteger la petición.
     public String getAuthorizationUrl(Long barId) {
         Bar bar = barRepository.findById(barId).orElseThrow(() -> new RuntimeException("Bar no encontrado"));
         String clientId = bar.getClientId();
@@ -64,8 +65,8 @@ public class SpotifyService {
                 .build()
                 .toUriString();
     }
-
-    // 2. Validar el state recibido
+    // MÉTODO: Intercambia el código temporal por tokens definitivos. Desencripta el ClientSecret del bar 
+    // usando AES y guarda el AccessToken y el RefreshToken en la base de datos
     public void exchangeCodeForToken(String code, Long barId, String stateRecibido) {
         Bar bar = barRepository.findById(barId).orElseThrow(() -> new RuntimeException("Bar no encontrado"));
         
@@ -82,7 +83,8 @@ public class SpotifyService {
 
         processTokenRequest(code, null, "authorization_code", bar);
     }
-
+    // MÉTODO: El 'Guardián del Acceso'. Si el token ha caducado (1 hora), usa automáticamente 
+    // el Refresh Token para pedir uno nuevo sin que el usuario tenga que hacer nada.
     public String getAccessTokenForBar(Long barId) {
         Bar bar = barRepository.findById(barId).orElseThrow(() -> new RuntimeException("Bar no encontrado"));
         if (bar.getSpotifyRefreshToken() == null) throw new RuntimeException("Bar no conectado a Spotify");
@@ -92,7 +94,8 @@ public class SpotifyService {
         }
         return bar.getSpotifyAccessToken();
     }
-
+    // MÉTODO: Realiza la petición técnica POST a Spotify para intercambiar el código o el refresh_token por un nuevo access_token.
+    // Configura las cabeceras, el Basic Auth (Client ID:Client Secret) y el cuerpo de la petición.
     private void processTokenRequest(String code, String refreshToken, String grantType, Bar bar) {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
@@ -122,13 +125,14 @@ public class SpotifyService {
             throw new RuntimeException("Error en token de Spotify: " + e.getMessage()); 
         }
     }
-
+    // MÉTODO: Consulta a Spotify los dispositivos disponibles (PC, móvil, etc.). 
+    // Devuelve una lista para que el bar elija dónde quiere que suene la música.
     public Object getDevices(Long barId) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(getAccessTokenForBar(barId));
         return restTemplate.exchange("https://api.spotify.com/v1/me/player/devices", HttpMethod.GET, new HttpEntity<>(headers), Map.class).getBody();
     }
-
+    // MÉTODO: Realiza búsquedas de canciones o playlists enviando el token de seguridad en la cabecera.
     public Object search(String query, String type, Long barId) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(getAccessTokenForBar(barId));
@@ -139,13 +143,14 @@ public class SpotifyService {
                 .toUriString();
         return restTemplate.exchange(url, HttpMethod.GET, new HttpEntity<>(headers), Map.class).getBody();
     }
-
+    // MÉTODO: Obtiene la lista completa de canciones de una playlist de Spotify para la música de fondo.
     public Object getPlaylist(String playlistId, Long barId) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(getAccessTokenForBar(barId));
         return restTemplate.exchange("https://api.spotify.com/v1/playlists/" + playlistId, HttpMethod.GET, new HttpEntity<>(headers), Map.class).getBody();
     }
-
+    // MÉTODO: Comando de reproducción para una canción suelta (Pedido). 
+    // Envía una petición PUT a Spotify con el ID de la canción y el ID del dispositivo de salida.
     public void playTrack(String trackUri, String deviceId, Long barId) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(getAccessTokenForBar(barId));
@@ -153,7 +158,8 @@ public class SpotifyService {
         String url = "https://api.spotify.com/v1/me/player/play" + (deviceId != null ? "?device_id=" + deviceId : "");
         restTemplate.put(url, new HttpEntity<>(body, headers));
     }
-
+    // MÉTODO: Comando de reproducción para música de ambiente (Playlist). 
+    // Soporta 'offset' para reanudar la lista por la canción exacta donde se quedó.
     public void playContext(String contextUri, String deviceId, Long barId, String offsetUri) {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth(getAccessTokenForBar(barId));

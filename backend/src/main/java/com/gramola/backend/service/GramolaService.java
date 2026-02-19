@@ -30,7 +30,8 @@ public class GramolaService {
 
     @Value("${stripe.key.secret}")
     private String stripeSecretKey;
-
+    // MÉTODO: Registra un nuevo pedido. Valida el precio en la BD, guarda la canción en estado 'COLA' 
+    // y crea automáticamente el registro del pago asociado.
     @Transactional
     public CancionSolicitada anadirCancion(Map<String, Object> datos) throws Exception {
         
@@ -99,15 +100,16 @@ public class GramolaService {
 
         return cancion;
     }
-
+    // MÉTODO: Recupera la lista de canciones pendientes para un bar, ordenadas por el momento en que se pagaron.
     public List<CancionSolicitada> obtenerCola(Long barId) {
         return cancionRepository.findByBarIdAndEstadoOrderByFechaSolicitudAsc(barId, "COLA");
     }
-
+    // MÉTODO: Devuelve las últimas 5 canciones que ya han terminado de sonar para mostrar en el panel del local.
     public List<CancionSolicitada> obtenerHistorial(Long barId) {
         return cancionRepository.findTop5ByBarIdAndEstadoOrderByFechaSolicitudDesc(barId, "TERMINADA");
     }
-
+    // MÉTODO: Actualiza el estado de la canción (COLA -> SONANDO -> TERMINADA). 
+    // Es el que permite que el sistema sepa qué debe sonar a continuación.
     @Transactional
     public void actualizarEstado(Long id, String estado) {
         CancionSolicitada c = cancionRepository.findById(id).orElseThrow();

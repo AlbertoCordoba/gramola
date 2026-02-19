@@ -16,7 +16,7 @@ export class LoginComponent {
   private barService = inject(BarService);
   private router = inject(Router);
   private cdr = inject(ChangeDetectorRef);
-
+  // OBJETO: Almacena las credenciales y las coordenadas que se enviarán al Backend.
   loginData = {
     email: '',
     password: '',
@@ -26,7 +26,10 @@ export class LoginComponent {
 
   errorMessage: string = '';
   cargando: boolean = false;
-
+  // MÉTODO: Punto de entrada al pulsar "Login". Primero intenta obtener la ubicación del usuario.
+  // 1. Activa el estado de carga.
+  // 2. Solicita permiso de ubicación al navegador.
+  // 3. Si el usuario acepta, guarda las coordenadas y llama a la petición de login.
   onLogin() {
     this.errorMessage = '';
     this.cargando = true;
@@ -52,7 +55,8 @@ export class LoginComponent {
       this.cdr.detectChanges();
     }
   }
-
+  // MÉTODO: Envía los datos al Backend. Si el login es correcto, guarda el usuario en 'localStorage' 
+  // y redirige a la pantalla principal (Gramola).
   enviarPeticionLogin() {
     this.barService.login(this.loginData).subscribe({
       next: (res: any) => {

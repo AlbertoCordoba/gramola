@@ -13,7 +13,7 @@ public class EmailService {
     @Autowired
     private JavaMailSender mailSender; // El "cartero" que nos da Spring Boot.
 
-    // --- CORREO DE BIENVENIDA ---
+    // MÉTODO: Envía el correo de bienvenida con un enlace único para confirmar la cuenta del bar.
     public void sendWelcomeEmail(String to, String token) {
         String subject = "Bienvenido a la fiesta - Gramola Virtual";
         // Construimos la URL única con el token para que el usuario haga clic
@@ -29,7 +29,7 @@ public class EmailService {
         sendHtmlEmail(to, subject, htmlContent);
     }
 
-    // --- CORREO DE RECUPERACIÓN ---
+    // MÉTODO: Envía un enlace al correo del bar para que pueda restablecer su contraseña de forma segura.
     public void sendPasswordRecoveryEmail(String to, String token) {
         String subject = "Recupera tu acceso 🔐";
         // Esta URL apunta al Frontend (Angular) para mostrar el formulario de nueva contraseña
@@ -45,7 +45,7 @@ public class EmailService {
         sendHtmlEmail(to, subject, htmlContent);
     }
 
-    // --- MÉTODO PRIVADO DE ENVÍO ---
+    // MÉTODO: Función interna que configura el mensaje (MimeMessage), define el destinatario, el asunto y el contenido HTML.
     private void sendHtmlEmail(String to, String subject, String htmlContent) {
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -64,7 +64,7 @@ public class EmailService {
         }
     }
 
-    // --- NUEVO: Generador de Plantilla HTML Bonita (Java 17 Text Blocks) ---
+    // MÉTODO: Genera la estructura visual (plantilla) en HTML/CSS para que los correos tengan un diseño profesional tipo Spotify.
     private String createHtmlTemplate(String title, String bodyText, String btnText, String btnUrl) {
         return """
             <!DOCTYPE html>

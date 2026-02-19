@@ -15,7 +15,7 @@ public class SpotifyController {
 
     @Autowired
     private SpotifyService spotifyService;
-
+    // MÉTODO: Genera la URL oficial de Spotify para que el bar autorice la conexión de su cuenta.
     @GetMapping("/auth-url")
     public ResponseEntity<?> getAuthUrl(@RequestParam Long barId) {
         try {
@@ -24,7 +24,7 @@ public class SpotifyController {
             return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
         }
     }
-
+    // MÉTODO: Recibe el código de Spotify tras el login del bar y lo intercambia por un Token de acceso.
     @GetMapping("/callback")
     public ResponseEntity<?> callback(@RequestParam String code, @RequestParam String state) {
         try {
@@ -42,7 +42,7 @@ public class SpotifyController {
             return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
         }
     }
-
+    // MÉTODO: Recupera el Token de acceso actual del bar. Si ha caducado, el servicio lo refresca automáticamente.
     @GetMapping("/token")
     public ResponseEntity<?> getToken(@RequestParam Long barId) {
         try {
@@ -52,7 +52,7 @@ public class SpotifyController {
             return ResponseEntity.status(401).body(Collections.singletonMap("error", e.getMessage()));
         }
     }
-
+   // MÉTODO: Lista los dispositivos donde el bar tiene Spotify abierto (móvil, PC, tablet) para elegir dónde suena la música.
     @GetMapping("/devices")
     public ResponseEntity<?> getDevices(@RequestParam Long barId) {
         try {
@@ -61,12 +61,12 @@ public class SpotifyController {
             return ResponseEntity.status(500).body(Collections.singletonMap("error", e.getMessage()));
         }
     }
-
+    // MÉTODO: Realiza búsquedas de canciones o playlists en Spotify usando el token del bar.
     @GetMapping("/search")
     public ResponseEntity<?> search(@RequestParam String q, @RequestParam Long barId, @RequestParam(defaultValue = "track") String type) {
         return ResponseEntity.ok(spotifyService.search(q, type, barId));
     }
-
+    // MÉTODO: Obtiene todos los detalles y canciones de una playlist específica de Spotify.
     @GetMapping("/playlist")
     public ResponseEntity<?> getPlaylist(@RequestParam String id, @RequestParam Long barId) {
         try {
@@ -75,7 +75,7 @@ public class SpotifyController {
             return ResponseEntity.badRequest().body(Collections.singletonMap("error", e.getMessage()));
         }
     }
-    
+    // MÉTODO: El "mando a distancia". Envía a Spotify la orden de reproducir una canción específica o una lista de ambiente.
     @PostMapping("/play")
     public ResponseEntity<?> play(@RequestBody Map<String, Object> payload) {
         try {
